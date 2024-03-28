@@ -32,7 +32,7 @@ def cli(arg_list) -> None:
 	program.add_argument('-s', '--source', help = wording.get('source_help'), dest = 'source_path')
 	program.add_argument('-t', '--target', help = wording.get('target_help'), dest = 'target_path')
 	program.add_argument('-o', '--output', help = wording.get('output_help'), dest = 'output_path')
-	program.add_argument('-s3-output', help = wording.get('s3_output_help'), dest = 's3_output_path')
+	program.add_argument('-u', '--s3-output', help = wording.get('s3_output_help'), dest = 's3_output_path')
 	program.add_argument('-v', '--version', version = metadata.get('name') + ' ' + metadata.get('version'), action = 'version')
 	# misc
 	group_misc = program.add_argument_group('misc')
@@ -86,10 +86,10 @@ def cli(arg_list) -> None:
 		frame_processor_module.register_args(group_frame_processors)
 	# uis
 	group_uis = program.add_argument_group('uis')
-	group_uis.add_argument('--ui-layouts', help = wording.get('ui_layouts_help').format(choices = ', '.join(list_module_names('facefusion/uis/layouts'))), dest = 'ui_layouts', default = [ 'default' ], nargs = '+')   
+	group_uis.add_argument('--ui-layouts', help = wording.get('ui_layouts_help').format(choices = ', '.join(list_module_names('facefusion/uis/layouts'))), dest = 'ui_layouts', default = [ 'default' ], nargs = '+')
 	run(program,arg_list)
 	return "0"
-    
+
 
 
 def apply_args(program : ArgumentParser,arg_list) -> None:
@@ -249,7 +249,7 @@ def write_to_s3(output_local_url, ouptput_s3_url):
         Key=key,
         ContentType='video/mp4')
 
-        
+
 def process_video() -> None:
 	if analyse_video(facefusion.globals.target_path, facefusion.globals.trim_frame_start, facefusion.globals.trim_frame_end):
 		return
@@ -284,7 +284,7 @@ def process_video() -> None:
 		if not restore_audio(facefusion.globals.target_path, facefusion.globals.output_path):
 			update_status(wording.get('restoring_audio_failed'))
 			move_temp(facefusion.globals.target_path, facefusion.globals.output_path)
-	write_to_s3(facefusion.globals.output_path,facefusion.globals.s3_output_path) 
+	write_to_s3(facefusion.globals.output_path,facefusion.globals.s3_output_path)
 	# clear temp
 	update_status(wording.get('clearing_temp'))
 	clear_temp(facefusion.globals.target_path)

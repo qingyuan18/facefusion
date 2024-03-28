@@ -6,6 +6,7 @@ WORDING =\
 	'source_help': 'select a source image',
 	'target_help': 'select a target image or video',
 	'output_help': 'specify the output file or directory',
+	's3_output_help': 's3 output path for upload result to s3 ',
 	'frame_processors_help': 'choose from the available frame processors (choices: {choices}, ...)',
 	'frame_processor_model_help': 'choose the model for the frame processor',
 	'frame_processor_blend_help': 'specify the blend factor for the frame processor',
