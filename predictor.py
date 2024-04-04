@@ -9,9 +9,10 @@ import os
 import sys
 import flask
 import subprocess
+import threading
 from facefusion import core
+import boto3
 
-#https://github.com/aws-samples/sagemaker-stablediffusion-quick-kit/blob/main/inference/sagemaker/byoc_sdxl/code/inference.py
 prefix = "/opt/ml/"
 model_path = os.path.join(prefix, "model")
 
@@ -40,48 +41,30 @@ def transformation():
     input_json = flask.request.get_json()
     if input_json['method']=="submit":
         args = input_json['input']
-        print(args)
-        result=core.cli(args)
+        #print(args)
+        #result=core.cli(args)
+        thread = threading.Thread(target=core.cli, args=(args,))
+        thread.start()
+        result = {"message": "Command executed in background"}
     elif input_json['method']=="get_status":
         s3_ouput_path= input_json['input']
         # 使用 Boto3 检查输出目录是否有文件生成
         s3 = boto3.resource('s3')
-        bucket_name, key = get_bucket_and_key(model_path)
+        output_s3_path = input_json['input']
+        bucket_name, key = get_bucket_and_key(output_s3_path)
         bucket = s3.Bucket(bucket_name)
         objects = list(bucket.objects.filter(Prefix=key))
         if objects:
             result = {"status": "success"}
         else:
             result = {"status": "processing"}
-    elif input_json['method']=="get_result":
-        # 返回 S3 路径
-        s3_ouput_path= input_json['input']
-        result = {
-            "s3_output_path": s3_ouput_path
-        }
-    else：
+    else:
         result={"message":"not supported method"}
 
     # 返回结果
     print(json.dumps(result))
     
-    return flask.Response(response=result, status=200, mimetype="application/json")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return flask.Response(response=json.dumps(result), status=200, mimetype="application/json")
 
 
 #     # 执行 run.py,并传递命令行参数

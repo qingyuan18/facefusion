@@ -19,6 +19,12 @@ import signal
 import subprocess
 import sys
 
+## for debug only
+#import os
+#import sagemaker_ssh_helper
+#sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+#sagemaker_ssh_helper.setup_and_start_ssh()
+
 cpu_count = multiprocessing.cpu_count()
 
 model_server_timeout = os.environ.get('MODEL_SERVER_TIMEOUT', 60)
@@ -45,12 +51,15 @@ def start_server():
     subprocess.check_call(['ln', '-sf', '/dev/stderr', '/var/log/nginx/error.log'])
 
     nginx = subprocess.Popen(['nginx', '-c', '/opt/program/nginx.conf'])
-    gunicorn = subprocess.Popen(['gunicorn',
-                                 '--timeout', str(model_server_timeout),
-                                 '-k', 'sync',
-                                 '-b', 'unix:/tmp/gunicorn.sock',
-                                 '-w', str(model_server_workers),
-                                 'wsgi:app'])
+    #gunicorn = subprocess.Popen(['gunicorn',
+    #                             '--timeout', str(model_server_timeout),
+    #                             '-k', 'sync',
+    #                             '-b', 'unix:/tmp/gunicorn.sock',
+    #                             '-w', str(model_server_workers),
+    #                             'wsgi:app'])
+    gunicorn = subprocess.Popen('gunicorn --timeout '+ str(model_server_timeout)+
+                                 ' -k  sync -b unix:/tmp/gunicorn.sock -w ' +
+                                 str(model_server_workers)+' wsgi:app',shell=True)
 
     signal.signal(signal.SIGTERM, lambda a, b: sigterm_handler(nginx.pid, gunicorn.pid))
 
