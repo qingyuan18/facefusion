@@ -9,6 +9,8 @@ import platform
 import shutil
 import onnxruntime
 from argparse import ArgumentParser, HelpFormatter
+import io
+import boto3
 
 import facefusion.choices
 import facefusion.globals
@@ -25,8 +27,14 @@ warnings.filterwarnings('ignore', category = UserWarning, module = 'gradio')
 warnings.filterwarnings('ignore', category = UserWarning, module = 'torchvision')
 
 
+def get_bucket_and_key(s3uri):
+    pos = s3uri.find('/', 5)
+    bucket = s3uri[5 : pos]
+    key = s3uri[pos + 1 : ]
+    return bucket, key
+
 def cli(arg_list) -> None:
-	signal.signal(signal.SIGINT, lambda signal_number, frame: destroy())
+	#signal(signal.SIGINT, lambda signal_number, frame: destroy())
 	program = ArgumentParser(formatter_class = lambda prog: HelpFormatter(prog, max_help_position = 120), add_help = False)
 	# general
 	program.add_argument('-s', '--source', help = wording.get('source_help'), dest = 'source_path')
@@ -86,16 +94,18 @@ def cli(arg_list) -> None:
 		frame_processor_module.register_args(group_frame_processors)
 	# uis
 	group_uis = program.add_argument_group('uis')
-	group_uis.add_argument('--ui-layouts', help = wording.get('ui_layouts_help').format(choices = ', '.join(list_module_names('facefusion/uis/layouts'))), dest = 'ui_layouts', default = [ 'default' ], nargs = '+')
+	group_uis.add_argument('--ui-layouts', help = wording.get('ui_layouts_help').format(choices = ', '.join(list_module_names('facefusion/uis/layouts'))), dest = 'ui_layouts', default = [ 'default' ], nargs = '+')   
 	run(program,arg_list)
 	return "0"
-
+    
 
 
 def apply_args(program : ArgumentParser,arg_list) -> None:
 # 	args = program.parse_args()
 	print("arglist",arg_list)
-	args=program.parse_args(arg_list)
+	#args=program.parse_args(arg_list)
+	args, unknown = program.parse_known_args(arg_list)
+	print("unknow args:",unknown)
 	# general
 	facefusion.globals.source_path = args.source_path
 	facefusion.globals.target_path = args.target_path
@@ -141,9 +151,10 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 	facefusion.globals.frame_processors = args.frame_processors
 	for frame_processor in available_frame_processors:
 		frame_processor_module = load_frame_processor_module(frame_processor)
-		frame_processor_module.apply_args(program)
+		frame_processor_module.apply_args(program,arg_list)
 	# uis
 	facefusion.globals.ui_layouts = args.ui_layouts
+	#print("apply_args finished!")
 
 
 def run(program : ArgumentParser,arg_list) -> None:
@@ -155,10 +166,10 @@ def run(program : ArgumentParser,arg_list) -> None:
 		if not frame_processor_module.pre_check():
 			return
 	if facefusion.globals.headless:
+		print("here1===")
 		conditional_process()
 	else:
 		import facefusion.uis.core as ui
-
 		for ui_layout in ui.get_ui_layouts_modules(facefusion.globals.ui_layouts):
 			if not ui_layout.pre_check():
 				return
@@ -235,7 +246,7 @@ def process_image() -> None:
 	else:
 		update_status(wording.get('processing_image_failed'))
 
-def write_to_s3(output_local_url, ouptput_s3_url):
+def write_to_s3(output_local_url, output_s3_url):
     video_local_file = output_local_url
     bucket, key = get_bucket_and_key(output_s3_url)
     buf = io.BytesIO()
@@ -243,13 +254,14 @@ def write_to_s3(output_local_url, ouptput_s3_url):
     with open(video_local_file, 'rb') as f:
         buf.write(f.read())
     # 将BytesIO对象的内容上传到S3
+    s3_client = boto3.client('s3')
     s3_client.put_object(
         Body=buf.getvalue(),
         Bucket=bucket,
         Key=key,
         ContentType='video/mp4')
 
-
+        
 def process_video() -> None:
 	if analyse_video(facefusion.globals.target_path, facefusion.globals.trim_frame_start, facefusion.globals.trim_frame_end):
 		return
@@ -284,7 +296,7 @@ def process_video() -> None:
 		if not restore_audio(facefusion.globals.target_path, facefusion.globals.output_path):
 			update_status(wording.get('restoring_audio_failed'))
 			move_temp(facefusion.globals.target_path, facefusion.globals.output_path)
-	write_to_s3(facefusion.globals.output_path,facefusion.globals.s3_output_path)
+	write_to_s3(facefusion.globals.output_path,facefusion.globals.s3_output_path) 
 	# clear temp
 	update_status(wording.get('clearing_temp'))
 	clear_temp(facefusion.globals.target_path)

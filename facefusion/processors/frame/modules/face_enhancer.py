@@ -114,8 +114,8 @@ def register_args(program : ArgumentParser) -> None:
 	program.add_argument('--face-enhancer-blend', help = wording.get('frame_processor_blend_help'), dest = 'face_enhancer_blend', type = int, default = 80, choices = frame_processors_choices.face_enhancer_blend_range, metavar = create_metavar(frame_processors_choices.face_enhancer_blend_range))
 
 
-def apply_args(program : ArgumentParser) -> None:
-	args = program.parse_args()
+def apply_args(program : ArgumentParser,arg_list) -> None:
+	args = program.parse_args(arg_list)
 	frame_processors_globals.face_enhancer_model = args.face_enhancer_model
 	frame_processors_globals.face_enhancer_blend = args.face_enhancer_blend
 

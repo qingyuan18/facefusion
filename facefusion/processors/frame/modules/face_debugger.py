@@ -37,8 +37,8 @@ def register_args(program : ArgumentParser) -> None:
 	program.add_argument('--face-debugger-items', help = wording.get('face_debugger_items_help'), dest = 'face_debugger_items', default = [ 'kps', 'face-mask' ], choices = frame_processors_choices.face_debugger_items, nargs = '+')
 
 
-def apply_args(program : ArgumentParser) -> None:
-	args = program.parse_args()
+def apply_args(program : ArgumentParser,arg_list) -> None:
+	args = program.parse_args(arg_list)
 	frame_processors_globals.face_debugger_items = args.face_debugger_items
 
 
