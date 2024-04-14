@@ -1,3 +1,4 @@
+####  调用SageMaker endpoint 封装接口 #########
 import uuid
 import boto3
 import os
