@@ -94,10 +94,10 @@ def cli(arg_list) -> None:
 		frame_processor_module.register_args(group_frame_processors)
 	# uis
 	group_uis = program.add_argument_group('uis')
-	group_uis.add_argument('--ui-layouts', help = wording.get('ui_layouts_help').format(choices = ', '.join(list_module_names('facefusion/uis/layouts'))), dest = 'ui_layouts', default = [ 'default' ], nargs = '+')   
+	group_uis.add_argument('--ui-layouts', help = wording.get('ui_layouts_help').format(choices = ', '.join(list_module_names('facefusion/uis/layouts'))), dest = 'ui_layouts', default = [ 'default' ], nargs = '+')
 	run(program,arg_list)
 	return "0"
-    
+
 
 
 def apply_args(program : ArgumentParser,arg_list) -> None:
@@ -227,7 +227,21 @@ def conditional_set_face_reference() -> None:
 		set_face_reference(reference_face)
 
 
+def pre_download()-> None:
+    if "s3" in facefusion.globals.source_path:
+        file_name = os.path.basename(facefusion.globals.source_path)
+        download_file = "/tmp/"+file_name
+        download_from_s3(facefusion.globals.source_path,download_file)
+        facefusion.globals.source_path = "/tmp/"+file_name
+    if "s3" in  facefusion.globals.target_path:
+        file_name = os.path.basename(facefusion.globals.target_path)
+        download_file = "/tmp/"+file_name
+        download_from_s3(facefusion.globals.target_path,"/tmp/"+file_name)
+        facefusion.globals.target_path = "/tmp/"+file_name
+
+
 def process_image() -> None:
+    pre_download()
 	if analyse_image(facefusion.globals.target_path):
 		return
 	shutil.copy2(facefusion.globals.target_path, facefusion.globals.output_path)
@@ -261,7 +275,17 @@ def write_to_s3(output_local_url, output_s3_url):
         Key=key,
         ContentType='video/mp4')
 
-        
+def download_from_s3(source_s3_url,local_file_path):
+    s3 = boto3.client('s3')
+    bucbucket_nameket, s3_file_path = get_bucket_and_key(source_s3_url)
+    # 下载文件
+    try:
+        s3.download_file(bucket_name, s3_file_path, local_file_path)
+        print(f'文件 {s3_file_path} 已下载到 {local_file_path}')
+    except Exception as e:
+        print(f'下载失败: {e}')
+
+
 def process_video() -> None:
 	if analyse_video(facefusion.globals.target_path, facefusion.globals.trim_frame_start, facefusion.globals.trim_frame_end):
 		return
@@ -296,7 +320,7 @@ def process_video() -> None:
 		if not restore_audio(facefusion.globals.target_path, facefusion.globals.output_path):
 			update_status(wording.get('restoring_audio_failed'))
 			move_temp(facefusion.globals.target_path, facefusion.globals.output_path)
-	write_to_s3(facefusion.globals.output_path,facefusion.globals.s3_output_path) 
+	write_to_s3(facefusion.globals.output_path,facefusion.globals.s3_output_path)
 	# clear temp
 	update_status(wording.get('clearing_temp'))
 	clear_temp(facefusion.globals.target_path)
