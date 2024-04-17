@@ -207,6 +207,7 @@ def pre_check() -> bool:
 
 
 def conditional_process() -> None:
+    pre_download()
 	conditional_set_face_reference()
 	for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
 		if not frame_processor_module.pre_process('output'):
@@ -241,7 +242,6 @@ def pre_download()-> None:
 
 
 def process_image() -> None:
-    pre_download()
 	if analyse_image(facefusion.globals.target_path):
 		return
 	shutil.copy2(facefusion.globals.target_path, facefusion.globals.output_path)
