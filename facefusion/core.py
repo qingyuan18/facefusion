@@ -277,7 +277,7 @@ def write_to_s3(output_local_url, output_s3_url):
 
 def download_from_s3(source_s3_url,local_file_path):
     s3 = boto3.client('s3')
-    bucbucket_nameket, s3_file_path = get_bucket_and_key(source_s3_url)
+    bucket_name, s3_file_path = get_bucket_and_key(source_s3_url)
     # 下载文件
     try:
         s3.download_file(bucket_name, s3_file_path, local_file_path)
