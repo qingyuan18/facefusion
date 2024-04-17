@@ -21,10 +21,14 @@ def invoke_endpoint(request:str):
     print('返回：',result)
 
 class ModelClient:
+    sagemaker_endpoint = ""
     def __init__(self, model_id):
         self.model_id = model_id
         self.dynamodb = boto3.resource('dynamodb')
         self.s3 = boto3.client('s3')
+
+    def set_endpoint(self, sagemaker_endpoint):
+        self.sagemaker_endpoint = sagemaker_endpoint
 
     def submit_job(self, user_id, source_video_s3_path, swap_face_image_s3_path, output_video_s3_dir):
         job_id = f"{uuid.uuid4().hex}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
