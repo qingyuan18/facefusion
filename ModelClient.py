@@ -5,20 +5,6 @@ import os
 from datetime import datetime
 import json
 runtime_sm_client = boto3.client(service_name="sagemaker-runtime")
-endpointName="facefusion-sagemaker-endpoint2024-04-03-23-49-44"
-
-def invoke_endpoint(request:str):
-    content_type = "application/json"
-    request_body = request
-    payload = json.dumps(request_body)
-    print(payload)
-    response = runtime_sm_client.invoke_endpoint(
-        EndpointName=endpointName,
-        ContentType=content_type,
-        Body=payload,
-    )
-    result = response['Body'].read().decode()
-    print('返回：',result)
 
 class ModelClient:
     sagemaker_endpoint = ""
@@ -30,6 +16,20 @@ class ModelClient:
     def set_endpoint(self, sagemaker_endpoint):
         self.sagemaker_endpoint = sagemaker_endpoint
 
+    def invoke_endpoint(self,request:str):
+        content_type = "application/json"
+        request_body = request
+        payload = json.dumps(request_body)
+        print(payload)
+        global runtime_sm_client
+        response = runtime_sm_client.invoke_endpoint(
+            EndpointName=self.sagemaker_endpoint,
+            ContentType=content_type,
+            Body=payload,
+        )
+        result = response['Body'].read().decode()
+        print('返回：',result)
+
     def submit_job(self, user_id, source_video_s3_path, swap_face_image_s3_path, output_video_s3_dir):
         job_id = f"{uuid.uuid4().hex}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         output_video_name = f"{job_id}.mp4"
@@ -39,7 +39,7 @@ class ModelClient:
         request = {
         	        "method":"submit",
         	        "input":['-s',swap_face_image_s3_path,'-t',source_video_s3_path,'-o','/tmp/','-u',output_video_s3_path,'--headless'],}
-        invoke_endpoint(request)
+        self.invoke_endpoint(request)
 
 
         # 将数据写入 DynamoDB 的 job_trace 表

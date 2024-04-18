@@ -207,14 +207,18 @@ def pre_check() -> bool:
 
 
 def conditional_process() -> None:
-    pre_download()
+	pre_download()
+	print("here2====")
 	conditional_set_face_reference()
+	print("here3====")
 	for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
 		if not frame_processor_module.pre_process('output'):
 			return
 	if is_image(facefusion.globals.target_path):
+		print("here4====")
 		process_image()
 	if is_video(facefusion.globals.target_path):
+		print("here5====")
 		process_video()
 
 

@@ -133,9 +133,26 @@ def register_args(program : ArgumentParser) -> None:
 	program.add_argument('--face-swapper-model', help = wording.get('frame_processor_model_help'), dest = 'face_swapper_model', default = 'inswapper_128', choices = frame_processors_choices.face_swapper_models)
 
 
+def get_filename_from_s3_path(s3_path):
+	s3_path = s3_path.replace("s3://", "")
+	path_parts = s3_path.split("/")
+	filename = path_parts[-1]
+	return filename
+
+def check_exsit_local_file(local_path):
+	tmp_dir = local_path
+	source_image_filename = get_filename_from_s3_path(facefusion.globals.source_path)
+	source_image_file_full_path = os.path.join(tmp_dir, source_image_filename)
+	if os.path.isfile(source_image_file_full_path):
+		facefusion.globals.source_path = source_image_file_full_path
+	target_video_filename = get_filename_from_s3_path(facefusion.globals.target_path)
+	target_video_file_full_path = os.path.join(tmp_dir, target_video_filename)
+	if os.path.isfile(target_video_file_full_path):
+		facefusion.globals.target_path = target_video_file_full_path
+
 def apply_args(program : ArgumentParser,arg_list) -> None:
-    
 	args = program.parse_args(arg_list)
+	check_exsit_local_file("/tmp")
 	frame_processors_globals.face_swapper_model = args.face_swapper_model
 	if args.face_swapper_model == 'blendswap_256':
 		facefusion.globals.face_recognizer_model = 'arcface_blendswap'
