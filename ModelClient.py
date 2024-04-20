@@ -13,6 +13,13 @@ class ModelClient:
         self.dynamodb = boto3.resource('dynamodb')
         self.s3 = boto3.client('s3')
 
+    def get_bucket_and_key(self,s3uri):
+        pos = s3uri.find('/', 5)
+        bucket = s3uri[5 : pos]
+        key = s3uri[pos + 1 : ]
+        return bucket, key
+
+
     def set_endpoint(self, sagemaker_endpoint):
         self.sagemaker_endpoint = sagemaker_endpoint
 
@@ -63,7 +70,8 @@ class ModelClient:
 
         if 'Item' in response:
             output_video_s3_path = response['Item']['output_video_s3_path']
-            if self.s3.head_object(Bucket=os.path.dirname(output_video_s3_path), Key=os.path.basename(output_video_s3_path)):
+            bucket,key = self.get_bucket_and_key(output_video_s3_path)
+            if self.s3.head_object(Bucket=bucket, Key=key):
                 table.update_item(
                     Key={
                         'job_id': job_id

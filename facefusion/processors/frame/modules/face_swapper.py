@@ -2,6 +2,7 @@ from typing import Any, List, Dict, Literal, Optional
 from argparse import ArgumentParser
 import threading
 import numpy
+import os
 import onnx
 import onnxruntime
 from onnx import numpy_helper
