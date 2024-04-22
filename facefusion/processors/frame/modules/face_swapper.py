@@ -164,6 +164,7 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 
 
 def pre_check() -> bool:
+	check_exsit_local_file("/tmp")
 	if not facefusion.globals.skip_download:
 		download_directory_path = resolve_relative_path('../.assets/models')
 		model_url = get_options('model').get('url')
