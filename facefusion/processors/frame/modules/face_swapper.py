@@ -173,6 +173,8 @@ def pre_check() -> bool:
 
 
 def pre_process(mode : ProcessMode) -> bool:
+	check_exsit_local_file("/tmp")
+	print(f"facefusion.globals.source_path:{facefusion.globals.source_path}")
 	model_url = get_options('model').get('url')
 	model_path = get_options('model').get('path')
 	if not facefusion.globals.skip_download and not is_download_done(model_url, model_path):

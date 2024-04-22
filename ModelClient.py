@@ -45,7 +45,8 @@ class ModelClient:
         # 触发调用 SageMaker endpoint
         request = {
         	        "method":"submit",
-        	        "input":['-s',swap_face_image_s3_path,'-t',source_video_s3_path,'-o','/tmp/','-u',output_video_s3_path,'--headless'],}
+        	        "input":['-s',swap_face_image_s3_path,'-t',source_video_s3_path,
+                             '-o','/tmp/output/'+output_video_name,'-u',output_video_s3_path,'--headless'],}
         self.invoke_endpoint(request)
 
 
@@ -70,8 +71,9 @@ class ModelClient:
 
         if 'Item' in response:
             output_video_s3_path = response['Item']['output_video_s3_path']
-            bucket,key = self.get_bucket_and_key(output_video_s3_path)
-            if self.s3.head_object(Bucket=bucket, Key=key):
+            bucket, key = self.get_bucket_and_key(output_video_s3_path)
+            try:
+                self.s3.head_object(Bucket=bucket, Key=key)
                 table.update_item(
                     Key={
                         'job_id': job_id
@@ -85,10 +87,16 @@ class ModelClient:
                     }
                 )
                 return 'success'
-            else:
-                return 'not finished'
+            except self.s3.exceptions.ClientError as e:
+                if e.response['Error']['Code'] == '404':
+                    # 如果找不到对象，说明任务还未完成
+                    return 'not finished'
+                else:
+                    # 其他错误，你可以根据需要进行处理或记录
+                    print("Unexpected error: %s" % e)
+                    return 'error'
         else:
-            return 'not found job id: '+job_id
+            return 'not found job id: ' + job_id
 
     def get_result(self, job_id):
         table = self.dynamodb.Table('job_trace')
