@@ -20,10 +20,10 @@ import subprocess
 import sys
 
 ## for debug only
-#import os
-#import sagemaker_ssh_helper
-#sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
-#sagemaker_ssh_helper.setup_and_start_ssh()
+import os
+import sagemaker_ssh_helper
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+sagemaker_ssh_helper.setup_and_start_ssh()
 
 cpu_count = multiprocessing.cpu_count()
 

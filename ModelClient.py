@@ -46,6 +46,7 @@ class ModelClient:
         request = {
         	        "method":"submit",
         	        "input":['-s',swap_face_image_s3_path,'-t',source_video_s3_path,
+                             '--execution-providers','cuda',
                              '-o','/tmp/output/'+output_video_name,'-u',output_video_s3_path,'--headless'],}
         self.invoke_endpoint(request)
 
