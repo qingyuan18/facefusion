@@ -1,5 +1,6 @@
 #FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
-FROM nvcr.io/nvidia/pytorch:23.06-py3
+#FROM nvcr.io/nvidia/pytorch:23.06-py3
+FROM nvcr.io/nvidia/pytorch:22.08-py3
 
 ARG FACEFUSION_VERSION=2.4.1
 ENV TZ=Etc/UTC
@@ -18,7 +19,7 @@ COPY ./ /opt/program
 
 
 #RUN apt-get update
-#RUN apt-get install python3.10 -y
+RUN apt-get install python3.10 -y
 #RUN apt-get install python-is-python3 -y
 #RUN apt-get install pip -y
 RUN apt-get install git -y
@@ -42,3 +43,5 @@ WORKDIR /opt/program
 RUN chmod 755 serve
 RUN mkdir -p /tmp/facefusion/test/
 RUN chmod -R 777 /tmp/facefusion/test
+RUN mkdir -p /tmp/output/
+RUN chmod -R 777 /tmp/output
