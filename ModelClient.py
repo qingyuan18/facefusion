@@ -47,7 +47,7 @@ class ModelClient:
         	        "method":"submit",
         	        "input":['-s',swap_face_image_s3_path,'-t',source_video_s3_path,
                              '--execution-providers','cuda',
-                             '-o','/tmp/output/'+output_video_name,'-u',output_video_s3_path,'--headless'],}
+                             '-o','/opt/program/output/'+output_video_name,'-u',output_video_s3_path,'--headless'],}
         self.invoke_endpoint(request)
 
 
@@ -110,7 +110,8 @@ class ModelClient:
         if 'Item' in response:
             output_video_s3_path = response['Item']['output_video_s3_path']
             local_file_path = f"/tmp/{os.path.basename(output_video_s3_path)}"
-            self.s3.download_file(os.path.dirname(output_video_s3_path), os.path.basename(output_video_s3_path), local_file_path)
+            bucket,key = self.get_bucket_and_key(output_video_s3_path)
+            self.s3.download_file(bucket, key, local_file_path)
             with open(local_file_path, 'rb') as f:
                 video_binary = f.read()
             os.remove(local_file_path)
