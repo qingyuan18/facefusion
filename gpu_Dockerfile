@@ -1,15 +1,16 @@
-#FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 #FROM nvcr.io/nvidia/pytorch:23.06-py3
 #FROM nvcr.io/nvidia/pytorch:22.08-py3
-FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel
+#FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel
 
 ARG FACEFUSION_VERSION=2.4.1
 ENV TZ=Etc/UTC
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV PYTHONUNBUFFERED=TRUE
 ENV PYTHONDONTWRITEBYTECODE=TRUE
+ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH=/opt/program:/usr/local/cuda:${PATH}
-#ENV LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64/stubs/:/usr/local/cuda-11.8/lib64:/usr/local/cuda-11.8/cudnn/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
 
 
 
@@ -20,29 +21,41 @@ COPY ./ /opt/program
 
 
 RUN apt-get update
-#RUN apt-get install python3.10 -y
-#RUN apt-get install python-is-python3 -y
-#RUN apt-get install pip -y
+RUN apt-get install python3.10 -y
+RUN apt-get install python-is-python3 -y
 RUN apt-get install git -y
 RUN apt-get install curl -y
 
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ffmpeg \
-        && \
-    rm -rf /var/lib/apt/lists/*
-#RUN DEBIAN_FRONTEND=noninteractive && apt-get install ffmpeg -y --no-install-recommends
+## manually compile & install ffmpeg version
+#RUN apt-get install wget
+#RUN apt-get install yasm
+#RUN cd /opt/program/ && wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.gz && \
+#    tar -xvf ffmpeg-7.0.tar.gz && cd ffmpeg-7.0 && \
+#    ./configure --prefix=/usr/local && \
+#    make && make install
+
+RUN apt-get install pip -y
+RUN apt-get install -y ffmpeg
 RUN pip install asgiref
-RUN apt-get update && apt-get install -y nginx
+
+## manually set tzdata
+#RUN apt-get install -y tzdata && ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime && dpkg-reconfigure -f noninteractive tzdata
+#RUN TZ=Etc/UTC && DEBIAN_FRONTEND=noninteractive && apt-get install -y nginx
+
+RUN apt-get install nginx -y
 RUN pip install --no-cache-dir boto3 flask gunicorn
 # for debug only
 RUN pip install sagemaker_ssh_helper
-RUN pip install opencv-python==4.5.4.60
 
+##facefusion core dependent
 RUN python install.py --torch cuda --onnxruntime cuda
+
+##make sure opencv installation
+#RUN pip install opencv-python-headless
 WORKDIR /opt/program
 RUN chmod 755 serve
 RUN mkdir -p /tmp/facefusion/test/
 RUN chmod -R 777 /tmp/facefusion/test
-RUN mkdir -p /tmp/output/
-RUN chmod -R 777 /tmp/output
+RUN mkdir -p /opt/program/output/
+RUN chmod -R 777 /opt/program/output/
+
