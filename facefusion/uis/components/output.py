@@ -11,13 +11,20 @@ OUTPUT_IMAGE : Optional[gradio.Image] = None
 OUTPUT_VIDEO : Optional[gradio.Video] = None
 OUTPUT_START_BUTTON : Optional[gradio.Button] = None
 OUTPUT_CLEAR_BUTTON : Optional[gradio.Button] = None
+CHECKBOX: Optional[gradio.Checkbox] = None
+TEXT_INPUT: Optional[gradio.Textbox] = None
+CONFIRM_BUTTON: Optional[gradio.Button] = None
 
+model_client = ModelClient("facefusion-v2.2")
 
 def render() -> None:
 	global OUTPUT_IMAGE
 	global OUTPUT_VIDEO
 	global OUTPUT_START_BUTTON
 	global OUTPUT_CLEAR_BUTTON
+	global CHECKBOX
+    global TEXT_INPUT
+    global CONFIRM_BUTTON
 
 	OUTPUT_IMAGE = gradio.Image(
 		label = wording.get('output_image_or_video_label'),
@@ -35,18 +42,41 @@ def render() -> None:
 		value = wording.get('clear_button_label'),
 		size = 'sm'
 	)
+	CHECKBOX = gradio.Checkbox(
+        label="Enable Custom Endpoint",
+        value=False
+    )
+    TEXT_INPUT = gradio.Textbox(
+        label="Custom Endpoint",
+        disabled=True
+    )
+    CONFIRM_BUTTON = gradio.Button(
+        value="Confirm",
+        size='sm'
+    )
 
+
+def toggle_text_input(checked):
+    return gradio.Textbox(value="", disabled=not checked)
+
+def confirm(endpoint):
+    global  model_client
+    if endpoint:
+        model_client.set_endpoint(endpoint)
 
 def listen() -> None:
 	output_path_textbox = get_ui_component('output_path_textbox')
 	if output_path_textbox:
 		OUTPUT_START_BUTTON.click(start, inputs = output_path_textbox, outputs = [ OUTPUT_IMAGE, OUTPUT_VIDEO ])
 	OUTPUT_CLEAR_BUTTON.click(clear, outputs = [ OUTPUT_IMAGE, OUTPUT_VIDEO ])
+	CHECKBOX.change(toggle_text_input, inputs=CHECKBOX, outputs=TEXT_INPUT)
+    CONFIRM_BUTTON.click(confirm, inputs=TEXT_INPUT)
 
 
 def start(output_path : str) -> Tuple[gradio.Image, gradio.Video]:
 	facefusion.globals.output_path = normalize_output_path(facefusion.globals.source_path, facefusion.globals.target_path, output_path)
 	limit_resources()
+	## TBD
 	conditional_process()
 	if is_image(facefusion.globals.output_path):
 		return gradio.Image(value = facefusion.globals.output_path, visible = True), gradio.Video(value = None, visible = False)
