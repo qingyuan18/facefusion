@@ -1,11 +1,14 @@
 from typing import Tuple, Optional
 import gradio
+import os
+from pathlib import Path
 
 import facefusion.globals
 from facefusion import wording
 from facefusion.core import limit_resources, conditional_process
 from facefusion.uis.core import get_ui_component
 from facefusion.utilities import is_image, is_video, normalize_output_path, clear_temp
+from ModelClient import ModelClient
 
 OUTPUT_IMAGE : Optional[gradio.Image] = None
 OUTPUT_VIDEO : Optional[gradio.Video] = None
@@ -14,8 +17,8 @@ OUTPUT_CLEAR_BUTTON : Optional[gradio.Button] = None
 CHECKBOX: Optional[gradio.Checkbox] = None
 TEXT_INPUT: Optional[gradio.Textbox] = None
 CONFIRM_BUTTON: Optional[gradio.Button] = None
-
 model_client = ModelClient("facefusion-v2.2")
+
 
 def render() -> None:
 	global OUTPUT_IMAGE
@@ -77,7 +80,26 @@ def start(output_path : str) -> Tuple[gradio.Image, gradio.Video]:
 	facefusion.globals.output_path = normalize_output_path(facefusion.globals.source_path, facefusion.globals.target_path, output_path)
 	limit_resources()
 	## TBD
-	conditional_process()
+	if CHECKBOX.value:
+        job_id=client.submit_job("local_run",swap_face_image_s3_path=facefusion.globals.source_path,
+                               source_video_s3_path=facefusion.globals.target_path,
+                               output_video_s3_dir=facefusion.globals.output_video_s3_dir)
+        try:
+            while True:
+                  status = client.get_status( "local_run", job_id)
+                  if status == "success":
+                      break
+            response = client.get_result(job_id)
+            #把response bytes写入facefusion.global.output_path的路径下
+            output_dir = Path(facefusion.globals.output_path).parent
+            os.makedirs(output_dir, exist_ok=True)
+            with open(facefusion.globals.output_path, 'wb') as f:
+                f.write(response)
+        except Exception as e:
+            print(f'{e} process failed!, please check sagemaker endpoint logs')
+
+    else:
+	    conditional_process()
 	if is_image(facefusion.globals.output_path):
 		return gradio.Image(value = facefusion.globals.output_path, visible = True), gradio.Video(value = None, visible = False)
 	if is_video(facefusion.globals.output_path):
