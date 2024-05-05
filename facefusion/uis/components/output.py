@@ -2,6 +2,7 @@ from typing import Tuple, Optional
 import gradio
 import os
 from pathlib import Path
+import boto3
 
 import facefusion.globals
 from facefusion import wording
@@ -53,6 +54,10 @@ def render() -> None:
         label="Custom Endpoint",
         disabled=True
     )
+    BUCKET_NAME_INPUT = gradio.Textbox(
+            label="Bucket Name",
+            disabled=True
+    )
     CONFIRM_BUTTON = gradio.Button(
         value="Confirm",
         size='sm'
@@ -60,20 +65,21 @@ def render() -> None:
 
 
 def toggle_text_input(checked):
-    return gradio.Textbox(value="", disabled=not checked)
+    return gradio.Textbox(value="", disabled=not checked), gradio.Textbox(value="", disabled=not checked)
 
 def confirm(endpoint):
     global  model_client
     if endpoint:
         model_client.set_endpoint(endpoint)
+    facefusion.globals.output_video_s3_dir = f"s3://{bucket_name}/output/"
 
 def listen() -> None:
 	output_path_textbox = get_ui_component('output_path_textbox')
 	if output_path_textbox:
 		OUTPUT_START_BUTTON.click(start, inputs = output_path_textbox, outputs = [ OUTPUT_IMAGE, OUTPUT_VIDEO ])
 	OUTPUT_CLEAR_BUTTON.click(clear, outputs = [ OUTPUT_IMAGE, OUTPUT_VIDEO ])
-	CHECKBOX.change(toggle_text_input, inputs=CHECKBOX, outputs=TEXT_INPUT)
-    CONFIRM_BUTTON.click(confirm, inputs=TEXT_INPUT)
+	CHECKBOX.change(toggle_text_input, inputs=CHECKBOX, outputs=[TEXT_INPUT,BUCKET_NAME_INPUT])
+    CONFIRM_BUTTON.click(confirm, inputs=[TEXT_INPUT,BUCKET_NAME_INPUT])
 
 
 def start(output_path : str) -> Tuple[gradio.Image, gradio.Video]:
@@ -81,9 +87,21 @@ def start(output_path : str) -> Tuple[gradio.Image, gradio.Video]:
 	limit_resources()
 	## TBD
 	if CHECKBOX.value:
-        job_id=client.submit_job("local_run",swap_face_image_s3_path=facefusion.globals.source_path,
-                               source_video_s3_path=facefusion.globals.target_path,
-                               output_video_s3_dir=facefusion.globals.output_video_s3_dir)
+    # Upload input files to the specified S3 bucket
+        s3_client = boto3.client('s3')
+        bucket_name = BUCKET_NAME_INPUT.value
+        source_key = f"input/{Path(facefusion.globals.source_path).name}"
+        target_key = f"input/{Path(facefusion.globals.target_path).name}"
+        s3_client.upload_file(facefusion.globals.source_path, bucket_name, source_key)
+        s3_client.upload_file(facefusion.globals.target_path, bucket_name, target_key)
+    # update source image and video path
+        #facefusion.globals.source_path = f"s3://{bucket_name}/{source_key}"
+        #facefusion.globals.target_path = f"s3://{bucket_name}/{target_key}"
+    # submit to sagemaker by model Client
+        job_id = model_client.submit_job("local_run",
+                                        swap_face_image_s3_path=f"s3://{bucket_name}/{source_key}",
+                                        source_video_s3_path=f"s3://{bucket_name}/{target_key}",
+                                        output_video_s3_dir=facefusion.globals.output_video_s3_dir)
         try:
             while True:
                   status = client.get_status( "local_run", job_id)
