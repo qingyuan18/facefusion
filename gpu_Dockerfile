@@ -51,7 +51,7 @@ RUN pip install sagemaker_ssh_helper
 RUN python install.py --torch cuda --onnxruntime cuda
 
 ##make sure opencv installation
-#RUN pip install opencv-python-headless
+RUN pip install opencv-python-headless
 WORKDIR /opt/program
 RUN chmod 755 serve
 RUN mkdir -p /tmp/facefusion/test/
