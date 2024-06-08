@@ -1,13 +1,20 @@
 from typing import Dict, Optional, Any, List
 from types import ModuleType
+import os
 import importlib
 import sys
 import gradio
 
 import facefusion.globals
-from facefusion import metadata, wording
+from facefusion.uis import overrides
+from facefusion import metadata, logger, wording
 from facefusion.uis.typing import Component, ComponentName
-from facefusion.utilities import resolve_relative_path
+from facefusion.filesystem import resolve_relative_path
+
+os.environ['GRADIO_ANALYTICS_ENABLED'] = '0'
+
+gradio.processing_utils.encode_array_to_base64 = overrides.encode_array_to_base64
+gradio.processing_utils.encode_pil_to_base64 = overrides.encode_pil_to_base64
 
 UI_COMPONENTS: Dict[ComponentName, Component] = {}
 UI_LAYOUT_MODULES : List[ModuleType] = []
@@ -27,10 +34,13 @@ def load_ui_layout_module(ui_layout : str) -> Any:
 		for method_name in UI_LAYOUT_METHODS:
 			if not hasattr(ui_layout_module, method_name):
 				raise NotImplementedError
-	except ModuleNotFoundError:
-		sys.exit(wording.get('ui_layout_not_loaded').format(ui_layout = ui_layout))
+	except ModuleNotFoundError as exception:
+		logger.error(wording.get('ui_layout_not_loaded').format(ui_layout = ui_layout), __name__.upper())
+		logger.debug(exception.msg, __name__.upper())
+		sys.exit(1)
 	except NotImplementedError:
-		sys.exit(wording.get('ui_layout_not_implemented').format(ui_layout = ui_layout))
+		logger.error(wording.get('ui_layout_not_implemented').format(ui_layout = ui_layout), __name__.upper())
+		sys.exit(1)
 	return ui_layout_module
 
 
@@ -44,23 +54,39 @@ def get_ui_layouts_modules(ui_layouts : List[str]) -> List[ModuleType]:
 	return UI_LAYOUT_MODULES
 
 
-def get_ui_component(name : ComponentName) -> Optional[Component]:
-	if name in UI_COMPONENTS:
-		return UI_COMPONENTS[name]
+def get_ui_component(component_name : ComponentName) -> Optional[Component]:
+	if component_name in UI_COMPONENTS:
+		return UI_COMPONENTS[component_name]
 	return None
 
 
-def register_ui_component(name : ComponentName, component: Component) -> None:
-	UI_COMPONENTS[name] = component
+def get_ui_components(component_names : List[ComponentName]) -> Optional[List[Component]]:
+	ui_components = []
+
+	for component_name in component_names:
+		component = get_ui_component(component_name)
+		if component:
+			ui_components.append(component)
+	return ui_components
+
+
+def register_ui_component(component_name : ComponentName, component: Component) -> None:
+	UI_COMPONENTS[component_name] = component
 
 
 def launch() -> None:
+	ui_layouts_total = len(facefusion.globals.ui_layouts)
 	with gradio.Blocks(theme = get_theme(), css = get_css(), title = metadata.get('name') + ' ' + metadata.get('version')) as ui:
 		for ui_layout in facefusion.globals.ui_layouts:
 			ui_layout_module = load_ui_layout_module(ui_layout)
 			if ui_layout_module.pre_render():
-				ui_layout_module.render()
-				ui_layout_module.listen()
+				if ui_layouts_total > 1:
+					with gradio.Tab(ui_layout):
+						ui_layout_module.render()
+						ui_layout_module.listen()
+				else:
+					ui_layout_module.render()
+					ui_layout_module.listen()
 
 	for ui_layout in facefusion.globals.ui_layouts:
 		ui_layout_module = load_ui_layout_module(ui_layout)

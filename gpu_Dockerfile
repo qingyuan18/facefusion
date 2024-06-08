@@ -1,5 +1,4 @@
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
-#FROM nvcr.io/nvidia/pytorch:23.06-py3
+FROM nvcr.io/nvidia/pytorch:23.06-py3
 #FROM nvcr.io/nvidia/pytorch:22.08-py3
 #FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel
 
@@ -21,18 +20,9 @@ COPY ./ /opt/program
 
 
 RUN apt-get update
-RUN apt-get install python3.10 -y
-RUN apt-get install python-is-python3 -y
 RUN apt-get install git -y
 RUN apt-get install curl -y
 
-## manually compile & install ffmpeg version
-#RUN apt-get install wget
-#RUN apt-get install yasm
-#RUN cd /opt/program/ && wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.gz && \
-#    tar -xvf ffmpeg-7.0.tar.gz && cd ffmpeg-7.0 && \
-#    ./configure --prefix=/usr/local && \
-#    make && make install
 
 RUN apt-get install pip -y
 RUN apt-get install -y ffmpeg
@@ -48,10 +38,10 @@ RUN pip install --no-cache-dir boto3 flask gunicorn
 RUN pip install sagemaker_ssh_helper
 
 ##facefusion core dependent
-RUN python install.py --torch cuda --onnxruntime cuda
+RUN python install.py --skip-conda --onnxruntime default
 
 ##make sure opencv installation
-RUN pip install opencv-python-headless
+#RUN pip install opencv-python-headless
 WORKDIR /opt/program
 RUN chmod 755 serve
 RUN mkdir -p /tmp/facefusion/test/
