@@ -291,11 +291,11 @@ def download_from_s3(source_s3_url,local_file_path):
 
 
 def pre_download()-> None:
-    if "s3" in facefusion.globals.source_path:
-        file_name = os.path.basename(facefusion.globals.source_path)
+    if "s3" in facefusion.globals.source_paths[0]:
+        file_name = os.path.basename(facefusion.globals.source_paths[0])
         download_file = "/tmp/"+file_name
-        download_from_s3(facefusion.globals.source_path,download_file)
-        facefusion.globals.source_path = "/tmp/"+file_name
+        download_from_s3(facefusion.globals.source_paths[0],download_file)
+        facefusion.globals.source_paths[0] = "/tmp/"+file_name
     if "s3" in  facefusion.globals.target_path:
         file_name = os.path.basename(facefusion.globals.target_path)
         download_file = "/tmp/"+file_name

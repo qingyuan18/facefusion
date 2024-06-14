@@ -5,7 +5,7 @@ import numpy
 import onnx
 import onnxruntime
 from onnx import numpy_helper
-
+import os
 import facefusion.globals
 import facefusion.processors.frame.core as frame_processors
 from facefusion import config, process_manager, logger, wording
@@ -95,17 +95,17 @@ OPTIONS : Optional[OptionsWithModel] = None
 
 
 def get_filename_from_s3_path(s3_path):
-	s3_path = s3_path.replace("s3://", "")
-	path_parts = s3_path.split("/")
+	s3_path = s3_path[0].replace("s3://", "")
+	path_parts = s3_path[0].split("/")
 	filename = path_parts[-1]
 	return filename
 
 def check_exsit_local_file(local_path):
 	tmp_dir = local_path
-	source_image_filename = get_filename_from_s3_path(facefusion.globals.source_path)
+	source_image_filename = get_filename_from_s3_path(facefusion.globals.source_paths)
 	source_image_file_full_path = os.path.join(tmp_dir, source_image_filename)
 	if os.path.isfile(source_image_file_full_path):
-		facefusion.globals.source_path = source_image_file_full_path
+		facefusion.globals.source_paths = source_image_file_full_path
 	target_video_filename = get_filename_from_s3_path(facefusion.globals.target_path)
 	target_video_file_full_path = os.path.join(tmp_dir, target_video_filename)
 	if os.path.isfile(target_video_file_full_path):
@@ -215,7 +215,7 @@ def post_check() -> bool:
 
 def pre_process(mode : ProcessMode) -> bool:
 	check_exsit_local_file("/tmp")
-	print(f"facefusion.globals.source_path:{facefusion.globals.source_path}")
+	print(f"facefusion.globals.source_path:{facefusion.globals.source_paths}")
 	if not has_image(facefusion.globals.source_paths):
 		logger.error(wording.get('select_image_source') + wording.get('exclamation_mark'), NAME)
 		return False

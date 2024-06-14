@@ -28,9 +28,6 @@ RUN apt-get install pip -y
 RUN apt-get install -y ffmpeg
 RUN pip install asgiref
 
-## manually set tzdata
-#RUN apt-get install -y tzdata && ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime && dpkg-reconfigure -f noninteractive tzdata
-#RUN TZ=Etc/UTC && DEBIAN_FRONTEND=noninteractive && apt-get install -y nginx
 
 RUN apt-get install nginx -y
 RUN pip install --no-cache-dir boto3 flask gunicorn
@@ -38,10 +35,12 @@ RUN pip install --no-cache-dir boto3 flask gunicorn
 RUN pip install sagemaker_ssh_helper
 
 ##facefusion core dependent
-RUN python install.py --skip-conda --onnxruntime default
+#RUN python install.py --skip-conda --onnxruntime default
+RUN python install.py --skip-conda --onnxruntime cuda-12.2
 
-##make sure opencv installation
-#RUN pip install opencv-python-headless
+##fix opencv installation issue
+RUN pip install opencv-fixer==0.2.5
+RUN python -c "from opencv_fixer import AutoFix; AutoFix()"
 WORKDIR /opt/program
 RUN chmod 755 serve
 RUN mkdir -p /tmp/facefusion/test/
