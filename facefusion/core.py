@@ -10,7 +10,7 @@ import numpy
 import onnxruntime
 from time import sleep, time
 from argparse import ArgumentParser, HelpFormatter
-
+import io
 import facefusion.choices
 import facefusion.globals
 from facefusion.face_analyser import get_one_face, get_average_face
