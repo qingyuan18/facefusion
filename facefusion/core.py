@@ -31,16 +31,15 @@ from facefusion.vision import read_image, read_static_images, detect_image_resol
 onnxruntime.set_default_logger_severity(3)
 warnings.filterwarnings('ignore', category = UserWarning, module = 'gradio')
 
-
-
 def get_bucket_and_key(s3uri):
     pos = s3uri.find('/', 5)
     bucket = s3uri[5 : pos]
     key = s3uri[pos + 1 : ]
     return bucket, key
 
-def cli(arg_list) -> None:
-	#signal.signal(signal.SIGINT, lambda signal_number, frame: destroy())
+
+def cli() -> None:
+	signal.signal(signal.SIGINT, lambda signal_number, frame: destroy())
 	program = ArgumentParser(formatter_class = lambda prog: HelpFormatter(prog, max_help_position = 200), add_help = False)
 	# general
 	program.add_argument('-c', '--config', help = wording.get('help.config'), dest = 'config_path', default = 'facefusion.ini')
@@ -118,7 +117,6 @@ def cli(arg_list) -> None:
 	group_uis.add_argument('--open-browser', help=wording.get('help.open_browser'), action = 'store_true', default = config.get_bool_value('uis.open_browser'))
 	group_uis.add_argument('--ui-layouts', help = wording.get('help.ui_layouts').format(choices = ', '.join(available_ui_layouts)), default = config.get_str_list('uis.ui_layouts', 'default'), nargs = '+')
 	run(program,arg_list)
-	return "0"
 
 
 def apply_config(program : ArgumentParser) -> None:
@@ -139,7 +137,7 @@ def validate_args(program : ArgumentParser) -> None:
 		program.error(str(exception))
 
 
-def apply_args(program : ArgumentParser,arg_list) -> None:
+def apply_args(program : ArgumentParser) -> None:
 	print("arglist",arg_list)
 	args = program.parse_args(arg_list)
 	# general
@@ -188,8 +186,8 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 	facefusion.globals.keep_temp = args.keep_temp
 	# output creation
 	facefusion.globals.output_image_quality = args.output_image_quality
-	if is_image(facefusion.globals.target_path ):
-		output_image_resolution = detect_image_resolution(facefusion.globals.target_path )
+	if is_image(args.target_path):
+		output_image_resolution = detect_image_resolution(args.target_path)
 		output_image_resolutions = create_image_resolutions(output_image_resolution)
 		if args.output_image_resolution in output_image_resolutions:
 			facefusion.globals.output_image_resolution = args.output_image_resolution
@@ -200,22 +198,22 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 	facefusion.globals.output_video_quality = args.output_video_quality
 	if "s3" in facefusion.globals.target_path :
 	    pre_download()
-	if is_video(facefusion.globals.target_path ):
-		output_video_resolution = detect_video_resolution(facefusion.globals.target_path )
+	if is_video(facefusion.globals.target_path):
+		output_video_resolution = detect_video_resolution(facefusion.globals.target_path)
 		output_video_resolutions = create_video_resolutions(output_video_resolution)
 		if args.output_video_resolution in output_video_resolutions:
 			facefusion.globals.output_video_resolution = args.output_video_resolution
 		else:
 			facefusion.globals.output_video_resolution = pack_resolution(output_video_resolution)
-	if args.output_video_fps or is_video(facefusion.globals.target_path ):
-		facefusion.globals.output_video_fps = normalize_fps(args.output_video_fps) or detect_video_fps(facefusion.globals.target_path )
+	if args.output_video_fps or is_video(facefusion.globals.target_path):
+		facefusion.globals.output_video_fps = normalize_fps(args.output_video_fps) or detect_video_fps(facefusion.globals.target_path)
 	facefusion.globals.skip_audio = args.skip_audio
 	# frame processors
 	available_frame_processors = list_directory('facefusion/processors/frame/modules')
 	facefusion.globals.frame_processors = args.frame_processors
 	for frame_processor in available_frame_processors:
 		frame_processor_module = load_frame_processor_module(frame_processor)
-		frame_processor_module.apply_args(program,arg_list)
+		frame_processor_module.apply_args(program)
 	# uis
 	facefusion.globals.open_browser = args.open_browser
 	facefusion.globals.ui_layouts = args.ui_layouts
@@ -264,7 +262,6 @@ def pre_check() -> bool:
 		logger.error(wording.get('ffmpeg_not_installed'), __name__.upper())
 		return False
 	return True
-
 
 def write_to_s3(output_local_url, output_s3_url):
     video_local_file = output_local_url

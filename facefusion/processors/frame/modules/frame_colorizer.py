@@ -101,7 +101,7 @@ def register_args(program : ArgumentParser) -> None:
 	program.add_argument('--frame-colorizer-size', help = wording.get('help.frame_colorizer_size'), type = str, default = config.get_str_value('frame_processors.frame_colorizer_size', '256x256'), choices = frame_processors_choices.frame_colorizer_sizes)
 
 
-def apply_args(program : ArgumentParser,arg_list) -> None:
+def apply_args(program : ArgumentParser) -> None:
 	args = program.parse_args(arg_list)
 	frame_processors_globals.frame_colorizer_model = args.frame_colorizer_model
 	frame_processors_globals.frame_colorizer_blend = args.frame_colorizer_blend

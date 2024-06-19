@@ -46,22 +46,6 @@ def render() -> None:
 		value = wording.get('uis.clear_button'),
 		size = 'sm'
 	)
-	CHECKBOX = gradio.Checkbox(
-            label="Enable Custom Endpoint",
-            value=False
-        )
-    TEXT_INPUT = gradio.Textbox(
-        label="Custom Endpoint",
-        disabled=True
-    )
-    BUCKET_NAME_INPUT = gradio.Textbox(
-            label="Bucket Name",
-            disabled=True
-    )
-    CONFIRM_BUTTON = gradio.Button(
-        value="Confirm",
-        size='sm'
-    )
 
 
 def listen() -> None:
@@ -71,8 +55,6 @@ def listen() -> None:
 		OUTPUT_START_BUTTON.click(process, outputs = [ OUTPUT_IMAGE, OUTPUT_VIDEO, OUTPUT_START_BUTTON, OUTPUT_STOP_BUTTON ])
 	OUTPUT_STOP_BUTTON.click(stop, outputs = [ OUTPUT_START_BUTTON, OUTPUT_STOP_BUTTON ])
 	OUTPUT_CLEAR_BUTTON.click(clear, outputs = [ OUTPUT_IMAGE, OUTPUT_VIDEO ])
-	CHECKBOX.change(toggle_text_input, inputs=CHECKBOX, outputs=[TEXT_INPUT,BUCKET_NAME_INPUT])
-    CONFIRM_BUTTON.click(confirm, inputs=[TEXT_INPUT,BUCKET_NAME_INPUT])
 
 
 def start() -> Tuple[gradio.Button, gradio.Button]:
@@ -82,41 +64,10 @@ def start() -> Tuple[gradio.Button, gradio.Button]:
 
 
 def process() -> Tuple[gradio.Image, gradio.Video, gradio.Button, gradio.Button]:
-	if CHECKBOX.value:
-	    # Upload input files to the specified S3 bucket
-	        s3_client = boto3.client('s3')
-	        bucket_name = BUCKET_NAME_INPUT.value
-	        source_key = f"input/{Path(facefusion.globals.source_path).name}"
-	        target_key = f"input/{Path(facefusion.globals.target_path).name}"
-	        s3_client.upload_file(facefusion.globals.source_path, bucket_name, source_key)
-	        s3_client.upload_file(facefusion.globals.target_path, bucket_name, target_key)
-	    # update source image and video path
-	        #facefusion.globals.source_path = f"s3://{bucket_name}/{source_key}"
-	        #facefusion.globals.target_path = f"s3://{bucket_name}/{target_key}"
-	    # submit to sagemaker by model Client
-	        job_id = model_client.submit_job("local_run",
-	                                        swap_face_image_s3_path=f"s3://{bucket_name}/{source_key}",
-	                                        source_video_s3_path=f"s3://{bucket_name}/{target_key}",
-	                                        output_video_s3_dir=facefusion.globals.output_video_s3_dir)
-	        try:
-	            while True:
-	                  status = client.get_status( "local_run", job_id)
-	                  if status == "success":
-	                      break
-	            response = client.get_result(job_id)
-	            #把response bytes写入facefusion.global.output_path的路径下
-	            output_dir = Path(facefusion.globals.output_path).parent
-	            os.makedirs(output_dir, exist_ok=True)
-	            with open(facefusion.globals.output_path, 'wb') as f:
-	                f.write(response)
-	        except Exception as e:
-	            print(f'{e} process failed!, please check sagemaker endpoint logs')
-
-	else:
-		normed_output_path = normalize_output_path(facefusion.globals.target_path, facefusion.globals.output_path)
-		if facefusion.globals.system_memory_limit > 0:
-			limit_system_memory(facefusion.globals.system_memory_limit)
-		conditional_process()
+	normed_output_path = normalize_output_path(facefusion.globals.target_path, facefusion.globals.output_path)
+	if facefusion.globals.system_memory_limit > 0:
+		limit_system_memory(facefusion.globals.system_memory_limit)
+	conditional_process()
 	if is_image(normed_output_path):
 		return gradio.Image(value = normed_output_path, visible = True), gradio.Video(value = None, visible = False), gradio.Button(visible = True), gradio.Button(visible = False)
 	if is_video(normed_output_path):
