@@ -39,7 +39,7 @@ def get_bucket_and_key(s3uri):
 
 
 def cli(arg_list) -> None:
-	signal.signal(signal.SIGINT, lambda signal_number, frame: destroy())
+	#signal.signal(signal.SIGINT, lambda signal_number, frame: destroy())
 	program = ArgumentParser(formatter_class = lambda prog: HelpFormatter(prog, max_help_position = 200), add_help = False)
 	# general
 	program.add_argument('-c', '--config', help = wording.get('help.config'), dest = 'config_path', default = 'facefusion.ini')
