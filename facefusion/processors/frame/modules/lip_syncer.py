@@ -80,7 +80,7 @@ def register_args(program : ArgumentParser) -> None:
 	program.add_argument('--lip-syncer-model', help = wording.get('help.lip_syncer_model'), default = config.get_str_value('frame_processors.lip_syncer_model', 'wav2lip_gan'), choices = frame_processors_choices.lip_syncer_models)
 
 
-def apply_args(program : ArgumentParser) -> None:
+def apply_args(program : ArgumentParser,arg_list) -> None:
 	args = program.parse_args(arg_list)
 	frame_processors_globals.lip_syncer_model = args.lip_syncer_model
 

@@ -140,7 +140,7 @@ def register_args(program : ArgumentParser) -> None:
 	program.add_argument('--frame-enhancer-blend', help = wording.get('help.frame_enhancer_blend'), type = int, default = config.get_int_value('frame_processors.frame_enhancer_blend', '80'), choices = frame_processors_choices.frame_enhancer_blend_range, metavar = create_metavar(frame_processors_choices.frame_enhancer_blend_range))
 
 
-def apply_args(program : ArgumentParser) -> None:
+def apply_args(program : ArgumentParser,arg_list) -> None:
 	args = program.parse_args(arg_list)
 	frame_processors_globals.frame_enhancer_model = args.frame_enhancer_model
 	frame_processors_globals.frame_enhancer_blend = args.frame_enhancer_blend

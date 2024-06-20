@@ -137,7 +137,7 @@ def validate_args(program : ArgumentParser) -> None:
 		program.error(str(exception))
 
 
-def apply_args(program : ArgumentParser) -> None:
+def apply_args(program : ArgumentParser,arg_list) -> None:
 	print("arglist",arg_list)
 	args = program.parse_args(arg_list)
 	# general
@@ -213,7 +213,7 @@ def apply_args(program : ArgumentParser) -> None:
 	facefusion.globals.frame_processors = args.frame_processors
 	for frame_processor in available_frame_processors:
 		frame_processor_module = load_frame_processor_module(frame_processor)
-		frame_processor_module.apply_args(program)
+		frame_processor_module.apply_args(program,arg_list)
 	# uis
 	facefusion.globals.open_browser = args.open_browser
 	facefusion.globals.ui_layouts = args.ui_layouts
