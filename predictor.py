@@ -12,6 +12,11 @@ import subprocess
 import threading
 from facefusion import core
 import boto3
+from concurrent.futures import ThreadPoolExecutor
+import uuid
+
+# 创建一个线程池
+executor = ThreadPoolExecutor(max_workers=5)
 
 prefix = "/opt/ml/"
 model_path = os.path.join(prefix, "model")
@@ -43,8 +48,9 @@ def transformation():
         args = input_json['input']
         #print(args)
         #result=core.cli(args)
-        thread = threading.Thread(target=core.cli, args=(args,))
-        thread.start()
+        #thread = threading.Thread(target=core.cli, args=(args,))
+        #thread.start()
+        future = executor.submit(core.cli, args)
         result = {"message": "Command executed in background"}
     elif input_json['method']=="get_status":
         s3_ouput_path= input_json['input']
@@ -63,7 +69,7 @@ def transformation():
 
     # 返回结果
     print(json.dumps(result))
-    
+
     return flask.Response(response=json.dumps(result), status=200, mimetype="application/json")
 
 

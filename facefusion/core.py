@@ -465,6 +465,7 @@ def process_video(start_time : float) -> None:
 					return
 				logger.warn(wording.get('restoring_audio_skipped'), __name__.upper())
 				move_temp(facefusion.globals.target_path, normed_output_path)
+	print("here1==",normed_output_path)
 	write_to_s3(normed_output_path,facefusion.globals.s3_output_path)
 	# clear temp
 	logger.debug(wording.get('clearing_temp'), __name__.upper())
