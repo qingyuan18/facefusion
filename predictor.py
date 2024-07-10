@@ -48,10 +48,20 @@ def transformation():
         args = input_json['input']
         #print(args)
         #result=core.cli(args)
-        #thread = threading.Thread(target=core.cli, args=(args,))
-        #thread.start()
-        future = executor.submit(core.cli, args)
+
+        ## 后台执行
+        task_id = str(uuid.uuid4())
+        command = f"python run.py {' '.join(args)}"
+        output_file = f"/tmp/{task_id}.out"
+        error_file = f"/tmp/{task_id}.err"
+        full_command = f"nohup {command} > {output_file} 2> {error_file} &"
+        os.system(full_command)
         result = {"message": "Command executed in background"}
+
+
+        ## 线程执行
+        #future = executor.submit(core.cli, args)
+        #result = {"message": "Command executed in background"}
     elif input_json['method']=="get_status":
         s3_ouput_path= input_json['input']
         # 使用 Boto3 检查输出目录是否有文件生成

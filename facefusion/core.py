@@ -437,9 +437,10 @@ def process_video(start_time : float) -> None:
 	# merge video
 	logger.info(wording.get('merging_video').format(resolution = facefusion.globals.output_video_resolution, fps = facefusion.globals.output_video_fps), __name__.upper())
 	if merge_video(facefusion.globals.target_path, facefusion.globals.output_video_resolution, facefusion.globals.output_video_fps):
-		logger.debug(wording.get('merging_video_succeed'), __name__.upper())
+		logger.info(wording.get('merging_video_succeed'), __name__.upper())
 	else:
 		if is_process_stopping():
+			logger.info("process stopping")
 			return
 		logger.error(wording.get('merging_video_failed'), __name__.upper())
 		return
@@ -468,7 +469,7 @@ def process_video(start_time : float) -> None:
 	print("here1==",normed_output_path)
 	write_to_s3(normed_output_path,facefusion.globals.s3_output_path)
 	# clear temp
-	logger.debug(wording.get('clearing_temp'), __name__.upper())
+	logger.info(wording.get('clearing_temp'), __name__.upper())
 	clear_temp(facefusion.globals.target_path)
 	# validate video
 	if is_video(normed_output_path):
