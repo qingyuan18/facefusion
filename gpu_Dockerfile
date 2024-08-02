@@ -2,7 +2,7 @@ FROM nvcr.io/nvidia/pytorch:23.06-py3
 #FROM nvcr.io/nvidia/pytorch:22.08-py3
 #FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel
 
-ARG FACEFUSION_VERSION=2.4.1
+ARG FACEFUSION_VERSION=2.6.1
 ENV TZ=Etc/UTC
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV PYTHONUNBUFFERED=TRUE
