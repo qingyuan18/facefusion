@@ -326,6 +326,36 @@ def prepare_detect_frame(temp_vision_frame : VisionFrame, face_detector_size : s
 	detect_vision_frame = numpy.expand_dims(detect_vision_frame.transpose(2, 0, 1), axis = 0).astype(numpy.float32)
 	return detect_vision_frame
 
+def create_face_by_input(input_path: str) -> Optional[Face]:
+    if not os.path.isfile(input_path):
+        print(f"Warning: File not found - {input_path}")
+        return None
+
+    # 读取图像并转换为VisionFrame格式
+    image = cv2.imread(input_path)
+    if image is None:
+        print(f"Warning: Unable to read image - {input_path}")
+        return None
+
+    vision_frame: VisionFrame = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    face_landmark_68, face_landmark_68_score = detect_face_landmark_68(vision_frame)
+
+    if face_landmark_68 is None or face_landmark_68_score < facefusion.globals.face_landmarker_score:
+        print(f"Warning: No valid face landmarks detected in - {input_path}")
+        return None
+
+    embedding, normed_embedding = calc_embedding(vision_frame, landmarks.get('5/68'))
+    gender, age = detect_gender_age(vision_frame, bounding_box)
+
+    face = Face(
+        embedding=embedding,
+        normed_embedding=normed_embedding,
+        gender=gender,
+        age=age
+    )
+
+    return face
+
 
 def create_faces(vision_frame : VisionFrame, bounding_box_list : List[BoundingBox], face_landmark_5_list : List[FaceLandmark5], score_list : List[Score]) -> List[Face]:
 	faces = []
@@ -542,6 +572,13 @@ def find_similar_faces(reference_faces : FaceSet, vision_frame : VisionFrame, fa
 def compare_faces(face : Face, reference_face : Face, face_distance : float) -> bool:
 	current_face_distance = calc_face_distance(face, reference_face)
 	return current_face_distance < face_distance
+
+def compare_faces_by_inputs(input_reference_dict: dict, reference_face: Face, face_distance: float) -> bool:
+    for input_face in input_reference_dict.values():
+        current_face_distance = calc_face_distance(input_face, reference_face)
+        if current_face_distance < face_distance:
+            return True
+    return False
 
 
 def calc_face_distance(face : Face, reference_face : Face) -> float:

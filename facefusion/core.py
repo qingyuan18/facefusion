@@ -1,6 +1,7 @@
 import os
 
 os.environ['OMP_NUM_THREADS'] = '1'
+import json
 import boto3
 import signal
 import sys
@@ -300,6 +301,24 @@ def pre_download()-> None:
         download_file = "/tmp/"+file_name
         download_from_s3(facefusion.globals.target_path,"/tmp/"+file_name)
         facefusion.globals.target_path = "/tmp/"+file_name
+    if os.environ.get("faces_mapping"):
+            faces_mapping_json = json.loads(os.environ["faces_mapping"])
+
+            for key, value in faces_mapping_json.items():
+                if "s3" in key:
+                    file_name = os.path.basename(key)
+                    download_file = "/tmp/" + file_name
+                    download_from_s3(key, download_file)
+                    faces_mapping_json["/tmp/" + file_name] = faces_mapping_json.pop(key)
+
+                if "s3" in value:
+                    file_name = os.path.basename(value)
+                    download_file = "/tmp/" + file_name
+                    download_from_s3(value, download_file)
+                    faces_mapping_json[key] = "/tmp/" + file_name
+
+            # 更新环境变量中的 faces_mapping
+            os.environ["faces_mapping"] = json.dumps(faces_mapping_json)
 
 def conditional_process() -> None:
 	start_time = time()

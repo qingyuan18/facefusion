@@ -10,7 +10,7 @@ import facefusion.globals
 import facefusion.processors.frame.core as frame_processors
 from facefusion import config, process_manager, logger, wording
 from facefusion.execution import has_execution_provider, apply_execution_provider_options
-from facefusion.face_analyser import get_one_face, get_average_face, get_many_faces, find_similar_faces, clear_face_analyser
+from facefusion.face_analyser import get_one_face, get_average_face, get_many_faces,create_faces_by_inputs, find_similar_faces, clear_face_analyser
 from facefusion.face_masker import create_static_box_mask, create_occlusion_mask, create_region_mask, clear_face_occluder, clear_face_parser
 from facefusion.face_helper import warp_face_by_face_landmark_5, paste_back
 from facefusion.face_store import get_reference_faces
@@ -350,7 +350,7 @@ def process_frame(inputs : FaceSwapperInputs) -> VisionFrame:
 		similar_faces = find_similar_faces(reference_faces, target_vision_frame, facefusion.globals.reference_face_distance)
 		if similar_faces:
 			for similar_face in similar_faces:
-				target_vision_frame = swap_face(source_face, similar_face, target_vision_frame)
+    			target_vision_frame = swap_face(source_face, similar_face, target_vision_frame)
 	return target_vision_frame
 
 
@@ -359,16 +359,38 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 	source_frames = read_static_images(source_paths)
 	source_face = get_average_face(source_frames)
 
+	source_faces_inputs = []
+	faces_mapping_json = {}
+	if os.environ.get("faces_mapping"):
+       faces_mapping_json = json.loads(os.environ["faces_mapping"])
+       source_frames_inputs = read_static_images(source_paths)
+       for source_frames_input in source_frames_inputs:
+           source_faces_inputs.append(get_average_face(source_frames_input)
+
 	for queue_payload in process_manager.manage(queue_payloads):
 		target_vision_path = queue_payload['frame_path']
 		target_vision_frame = read_image(target_vision_path)
-		output_vision_frame = process_frame(
-		{
-			'reference_faces': reference_faces,
-			'source_face': source_face,
-			'target_vision_frame': target_vision_frame
-		})
-		write_image(target_vision_path, output_vision_frame)
+		if os.environ.get("faces_mapping"):
+		    index=0
+		    for source_face in source_faces_inputs:
+		        reference_faces =[create_faces_by_input(faces_mapping_json[index])]
+		        target_vision_frame = process_frame(
+		        {
+		    	    'reference_faces': reference_faces,
+		    	    'source_face': source_face,
+		    	    'target_vision_frame': target_vision_frame
+		        })
+		        index = index+1
+		    output_vision_frame =  target_vision_frame
+		    write_image(target_vision_path, output_vision_frame)
+		else:
+            output_vision_frame = process_frame(
+            {
+                'reference_faces': reference_faces,
+                'source_face': source_face,
+                'target_vision_frame': target_vision_frame
+            })
+		    write_image(target_vision_path, output_vision_frame)
 		update_progress(1)
 
 

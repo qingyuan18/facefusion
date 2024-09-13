@@ -37,17 +37,21 @@ class ModelClient:
         result = response['Body'].read().decode()
         print('返回：',result)
 
-    def submit_job(self, user_id, source_video_s3_path, swap_face_image_s3_path, output_video_s3_dir):
+    def submit_job(self, user_id, source_video_s3_path, swap_face_image_s3_path, output_video_s3_dir,faces_mapping_dict):
         job_id = f"{uuid.uuid4().hex}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         output_video_name = f"{job_id}.mp4"
         output_video_s3_path = output_video_s3_dir+"/"+output_video_name
 
         # 触发调用 SageMaker endpoint
+        inputs = ['-s',swap_face_image_s3_path,'-t',source_video_s3_path,
+                  '--execution-providers','cuda',
+                  '-o','/opt/program/output/'+output_video_name,'-u',output_video_s3_path,'--headless']
+        if faces_mapping_dict:
+            inputs.append(['--many',json.dumps(faces_mapping_dict)])
         request = {
         	        "method":"submit",
-        	        "input":['-s',swap_face_image_s3_path,'-t',source_video_s3_path,
-                             '--execution-providers','cuda',
-                             '-o','/opt/program/output/'+output_video_name,'-u',output_video_s3_path,'--headless'],}
+        	        "input":inputs,
+                    }
         self.invoke_endpoint(request)
 
 
