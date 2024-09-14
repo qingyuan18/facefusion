@@ -12,11 +12,8 @@ import subprocess
 import threading
 from facefusion import core
 import boto3
-from concurrent.futures import ThreadPoolExecutor
 import uuid
-
-# 创建一个线程池
-executor = ThreadPoolExecutor(max_workers=5)
+import base64
 
 prefix = "/opt/ml/"
 model_path = os.path.join(prefix, "model")
@@ -44,11 +41,15 @@ def ping():
 def transformation():
     # 获取命令行参数
     input_json = flask.request.get_json()
-    if input_json['method']=="submit":
+    if input_json['method']=="analyze":
         args = input_json['input']
-        #print(args)
-        #result=core.cli(args)
+        print(args)
+        reference_faces=core.cli(args)
+        encoded_faces = {k: base64.b64encode(v).decode('utf-8') for k, v in reference_faces.items()}
+        result = {"encoded_faces":encoded_faces}
 
+    elif input_json['method']=="submit":
+        args = input_json['input']
         ## 后台执行
         task_id = str(uuid.uuid4())
         command = f"python run.py {' '.join(args)}"
@@ -58,10 +59,6 @@ def transformation():
         os.system(full_command)
         result = {"message": "Command executed in background"}
 
-
-        ## 线程执行
-        #future = executor.submit(core.cli, args)
-        #result = {"message": "Command executed in background"}
     elif input_json['method']=="get_status":
         s3_ouput_path= input_json['input']
         # 使用 Boto3 检查输出目录是否有文件生成
@@ -79,23 +76,4 @@ def transformation():
 
     # 返回结果
     print(json.dumps(result))
-
     return flask.Response(response=json.dumps(result), status=200, mimetype="application/json")
-
-
-#     # 执行 run.py,并传递命令行参数
-#     process = subprocess.Popen(['python', 'run.py'] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-#     # 获取输出
-#     stdout, stderr = process.communicate()
-#     print(stdout.decode())
-#     # 检查是否有错误输出
-#     if stderr:
-#         print(f'Error: {stderr.decode()}')
-#         return
-
-#     # 获取返回的字符串
-#     predictions = stdout.decode().strip()
-
-#     # 将输出格式化为指定的格式
-#     result = {'results': predictions}

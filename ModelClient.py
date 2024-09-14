@@ -23,8 +23,8 @@ class ModelClient:
     def set_endpoint(self, sagemaker_endpoint):
         self.sagemaker_endpoint = sagemaker_endpoint
 
-    def invoke_endpoint(self,request:str):
-        content_type = "application/json"
+    def invoke_endpoint(self,request:str,content_type: str = "application/json"):
+        content_type = content_type or "application/json"
         request_body = request
         payload = json.dumps(request_body)
         print(payload)
@@ -36,6 +36,26 @@ class ModelClient:
         )
         result = response['Body'].read().decode()
         print('返回：',result)
+
+
+    def analyze_video(self, user_id, source_video_s3_path, frame_numer):
+        job_id = f"{uuid.uuid4().hex}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        # 触发调用 SageMaker endpoint
+        inputs = ['-s',swap_face_image_s3_path,
+                  '--execution-providers','cuda',
+                  '--analyze',frame_number,
+                  '--headless']
+        request = {
+        	        "method":"analyze",
+        	        "input":inputs,
+                    }
+        response = self.invoke_endpoint(request,content_type="application/jpeg")
+        return response['Body'].read().decode("UTF-8")
+
+
+
+
 
     def submit_job(self, user_id, source_video_s3_path, swap_face_image_s3_path, output_video_s3_dir,faces_mapping_dict):
         job_id = f"{uuid.uuid4().hex}-{datetime.now().strftime('%Y%m%d%H%M%S')}"

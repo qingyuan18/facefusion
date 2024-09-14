@@ -28,6 +28,8 @@ from facefusion.download import conditional_download
 from facefusion.filesystem import get_temp_frame_paths, get_temp_file_path, create_temp, move_temp, clear_temp, is_image, is_video, filter_audio_paths, resolve_relative_path, list_directory
 from facefusion.ffmpeg import extract_frames, merge_video, copy_image, finalize_image, restore_audio, replace_audio
 from facefusion.vision import read_image, read_static_images, detect_image_resolution, restrict_video_fps, create_image_resolutions, get_video_frame, detect_video_resolution, detect_video_fps, restrict_video_resolution, restrict_image_resolution, create_video_resolutions, pack_resolution, unpack_resolution
+from facefusion.face_analyser import get_one_face, get_many_faces
+from facefusion.vision import get_video_frame, read_static_image, normalize_frame_color
 
 onnxruntime.set_default_logger_severity(3)
 warnings.filterwarnings('ignore', category = UserWarning, module = 'gradio')
@@ -220,10 +222,36 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 	facefusion.globals.ui_layouts = args.ui_layouts
 
 
+def frame_to_binary(frame: VisionFrame) -> bytes:
+    return cv2.imencode('.png', frame)[1].tobytes()
+
 def run(program : ArgumentParser,arg_list) -> None:
 	validate_args(program)
 	apply_args(program,arg_list)
 	logger.init(facefusion.globals.log_level)
+
+	## if just analyze video frame, return the reference face image binary directly
+	if os.environ.get("analyze"):
+	   frame_number = os.environ.get("analyze")
+	   frame = get_video_frame(facefusion.globals.target_path, frame_number)
+	   reference_faces = get_many_faces(vision_frame)
+	   binary_faces = {}
+	   index=0
+	   for index, face in enumerate(reference_faces):
+       		start_x, start_y, end_x, end_y = map(int, face.bounding_box)
+       		padding_x = int((end_x - start_x) * 0.25)
+       		padding_y = int((end_y - start_y) * 0.25)
+       		start_x = max(0, start_x - padding_x)
+       		start_y = max(0, start_y - padding_y)
+       		end_x = max(0, end_x + padding_x)
+       		end_y = max(0, end_y + padding_y)
+
+       		crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
+       		crop_vision_frame = normalize_frame_color(crop_vision_frame)
+       		binary_face = frame_to_binary(crop_vision_frame)
+            binary_faces[index] = binary_face
+       return binary_faces
+
 
 	if facefusion.globals.system_memory_limit > 0:
 		limit_system_memory(facefusion.globals.system_memory_limit)
@@ -302,23 +330,21 @@ def pre_download()-> None:
         download_from_s3(facefusion.globals.target_path,"/tmp/"+file_name)
         facefusion.globals.target_path = "/tmp/"+file_name
     if os.environ.get("faces_mapping"):
-            faces_mapping_json = json.loads(os.environ["faces_mapping"])
+        faces_mapping_json = json.loads(os.environ["faces_mapping"])
+        for key, value in faces_mapping_json.items():
+            if "s3" in key:
+                file_name = os.path.basename(key)
+                download_file = "/tmp/" + file_name
+                download_from_s3(key, download_file)
+                faces_mapping_json["/tmp/" + file_name] = faces_mapping_json.pop(key)
 
-            for key, value in faces_mapping_json.items():
-                if "s3" in key:
-                    file_name = os.path.basename(key)
-                    download_file = "/tmp/" + file_name
-                    download_from_s3(key, download_file)
-                    faces_mapping_json["/tmp/" + file_name] = faces_mapping_json.pop(key)
-
-                if "s3" in value:
-                    file_name = os.path.basename(value)
-                    download_file = "/tmp/" + file_name
-                    download_from_s3(value, download_file)
-                    faces_mapping_json[key] = "/tmp/" + file_name
-
-            # 更新环境变量中的 faces_mapping
-            os.environ["faces_mapping"] = json.dumps(faces_mapping_json)
+            if "s3" in value:
+                file_name = os.path.basename(value)
+                download_file = "/tmp/" + file_name
+                download_from_s3(value, download_file)
+                faces_mapping_json[key] = "/tmp/" + file_name
+        # 更新环境变量中的 faces_mapping
+        os.environ["faces_mapping"] = json.dumps(faces_mapping_json)
 
 def conditional_process() -> None:
 	start_time = time()

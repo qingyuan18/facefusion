@@ -371,16 +371,14 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		target_vision_path = queue_payload['frame_path']
 		target_vision_frame = read_image(target_vision_path)
 		if os.environ.get("faces_mapping"):
-		    index=0
-		    for source_face in source_faces_inputs:
-		        reference_faces =[create_faces_by_input(faces_mapping_json[index])]
+		    for index, source_face in enumerate(source_faces_inputs):
+		        reference_faces_index = faces_mapping_json[index]
 		        target_vision_frame = process_frame(
 		        {
-		    	    'reference_faces': reference_faces,
+		    	    'reference_faces': [reference_faces[reference_faces_index]],
 		    	    'source_face': source_face,
 		    	    'target_vision_frame': target_vision_frame
 		        })
-		        index = index+1
 		    output_vision_frame =  target_vision_frame
 		    write_image(target_vision_path, output_vision_frame)
 		else:
