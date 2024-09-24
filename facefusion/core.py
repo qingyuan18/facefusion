@@ -231,8 +231,8 @@ def run(program : ArgumentParser,arg_list) -> None:
 	logger.init(facefusion.globals.log_level)
 
 	## if just analyze video frame, return the reference face image binary directly
-	if os.environ.get("analyze"):
-	   frame_number = os.environ.get("analyze")
+	if os.environ.get("analyze_index"):
+	   frame_number = os.environ.get("analyze_index")
 	   frame = get_video_frame(facefusion.globals.target_path, frame_number)
 	   reference_faces = get_many_faces(vision_frame)
 	   binary_faces = {}

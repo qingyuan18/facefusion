@@ -26,7 +26,7 @@ if __name__ == '__main__':
     if analyze_index != -1 and analyze_index + 1 < len(args):
         # 设置环境变量 "analyze_index"
         os.environ["analyze_index"] = args[analyze_index + 1]
-        # 从参数列表中移除 "--many" 及其值
+        # 从参数列表中移除 "--analyze_index" 及其值
         args = args[:analyze_index] + args[analyze_index+2:]
 
     # 调用 core.cli 函数，传递修改后的参数

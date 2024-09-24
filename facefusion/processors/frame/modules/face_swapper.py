@@ -372,6 +372,7 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		target_vision_frame = read_image(target_vision_path)
 		if os.environ.get("faces_mapping"):
 		    for index, source_face in enumerate(source_faces_inputs):
+		        ## opt1 : use mapping index of reference image
 		        reference_faces_index = faces_mapping_json[index]
 		        target_vision_frame = process_frame(
 		        {
@@ -379,6 +380,20 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		    	    'source_face': source_face,
 		    	    'target_vision_frame': target_vision_frame
 		        })
+		        ## opt2: use base64 mapping image
+		        reference_faces_refind=[]
+		        reference_face_input = create_face_by_base64(faces_mapping_json[index])
+		        for reference_face in reference_faces:
+		            ### find the simlilar reference face from frame
+		            if compare_faces(reference_face, reference_face_input, facefusion.globals.reference_face_distance):
+		                reference_faces_refind.append(reference_face)
+		        target_vision_frame = process_frame(
+                {
+                	'reference_faces': reference_faces_refind,
+                	'source_face': source_face,
+                	'target_vision_frame': target_vision_frame
+                })
+
 		    output_vision_frame =  target_vision_frame
 		    write_image(target_vision_path, output_vision_frame)
 		else:
