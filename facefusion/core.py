@@ -232,27 +232,25 @@ def run(program : ArgumentParser,arg_list) -> None:
 
 	## if just analyze video frame, return the reference face image binary directly
 	if os.environ.get("analyze_index"):
-	   frame_number = os.environ.get("analyze_index")
-	   frame = get_video_frame(facefusion.globals.target_path, frame_number)
-	   reference_faces = get_many_faces(vision_frame)
-	   binary_faces = {}
-	   index=0
-	   for index, face in enumerate(reference_faces):
-       		start_x, start_y, end_x, end_y = map(int, face.bounding_box)
-       		padding_x = int((end_x - start_x) * 0.25)
-       		padding_y = int((end_y - start_y) * 0.25)
-       		start_x = max(0, start_x - padding_x)
-       		start_y = max(0, start_y - padding_y)
-       		end_x = max(0, end_x + padding_x)
-       		end_y = max(0, end_y + padding_y)
+	    frame_number = os.environ.get("analyze_index")
+	    frame = get_video_frame(facefusion.globals.target_path, frame_number)
+	    reference_faces = get_many_faces(vision_frame)
+	    binary_faces = {}
+	    index=0
+	    for index, face in enumerate(reference_faces):
+            start_x, start_y, end_x, end_y = map(int, face.bounding_box)
+            padding_x = int((end_x - start_x) * 0.25)
+            padding_y = int((end_y - start_y) * 0.25)
+            start_x = max(0, start_x - padding_x)
+            start_y = max(0, start_y - padding_y)
+            end_x = max(0, end_x + padding_x)
+            end_y = max(0, end_y + padding_y)
 
-       		crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
-       		crop_vision_frame = normalize_frame_color(crop_vision_frame)
-       		binary_face = frame_to_binary(crop_vision_frame)
+            crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
+            crop_vision_frame = normalize_frame_color(crop_vision_frame)
+            binary_face = frame_to_binary(crop_vision_frame)
             binary_faces[index] = binary_face
-       return binary_faces
-
-
+        return binary_faces
 	if facefusion.globals.system_memory_limit > 0:
 		limit_system_memory(facefusion.globals.system_memory_limit)
 	if facefusion.globals.force_download:
@@ -319,11 +317,16 @@ def download_from_s3(source_s3_url,local_file_path):
 
 
 def pre_download()-> None:
-    if "s3" in facefusion.globals.source_paths[0]:
-        file_name = os.path.basename(facefusion.globals.source_paths[0])
-        download_file = "/tmp/"+file_name
-        download_from_s3(facefusion.globals.source_paths[0],download_file)
-        facefusion.globals.source_paths[0] = "/tmp/"+file_name
+    updated_paths: List[str] = []
+    for path in facefusion.globals.source_paths:
+        if path.startswith("s3://"):
+            file_name = os.path.basename(path)
+            download_file = os.path.join("/tmp", file_name)
+            download_from_s3(path, download_file)
+            updated_paths.append(download_file)
+        else:
+            updated_paths.append(path)
+    facefusion.globals.source_paths = updated_paths
     if "s3" in  facefusion.globals.target_path:
         file_name = os.path.basename(facefusion.globals.target_path)
         download_file = "/tmp/"+file_name

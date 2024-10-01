@@ -42,7 +42,7 @@ class ModelClient:
         job_id = f"{uuid.uuid4().hex}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
         # 触发调用 SageMaker endpoint
-        inputs = ['-s',swap_face_image_s3_path,
+        inputs = ['-t',source_video_s3_path,
                   '--execution-providers','cuda',
                   '--analyze',frame_number,
                   '--headless']
