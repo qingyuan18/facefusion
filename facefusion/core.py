@@ -25,6 +25,7 @@ from facefusion.normalizer import normalize_output_path, normalize_padding, norm
 from facefusion.memory import limit_system_memory
 from facefusion.statistics import conditional_log_statistics
 from facefusion.download import conditional_download
+from facefusion.typing import Face, Embedding, VisionFrame
 from facefusion.filesystem import get_temp_frame_paths, get_temp_file_path, create_temp, move_temp, clear_temp, is_image, is_video, filter_audio_paths, resolve_relative_path, list_directory
 from facefusion.ffmpeg import extract_frames, merge_video, copy_image, finalize_image, restore_audio, replace_audio
 from facefusion.vision import read_image, read_static_images, detect_image_resolution, restrict_video_fps, create_image_resolutions, get_video_frame, detect_video_resolution, detect_video_fps, restrict_video_resolution, restrict_image_resolution, create_video_resolutions, pack_resolution, unpack_resolution
@@ -226,50 +227,56 @@ def frame_to_binary(frame: VisionFrame) -> bytes:
     return cv2.imencode('.png', frame)[1].tobytes()
 
 def run(program : ArgumentParser,arg_list) -> None:
-	validate_args(program)
-	apply_args(program,arg_list)
-	logger.init(facefusion.globals.log_level)
+      ## if just analyze video frame, return the reference face image binary directly
+	  if "analyze_index" in arg_list:
+          index = arg_list.index("analyze_index")
+          if index + 1 < len(arg_list):
+              frame_number = arg_list[index + 1]
+              # Remove 'analyze_index' and its value from arg_list
+              arg_list = arg_list[:index] + arg_list[index+2:]
+          else:
+              print("Error: No value provided after 'analyze_index'")
+              return
 
-	## if just analyze video frame, return the reference face image binary directly
-	if os.environ.get("analyze_index"):
-	    frame_number = os.environ.get("analyze_index")
-	    frame = get_video_frame(facefusion.globals.target_path, frame_number)
-	    reference_faces = get_many_faces(vision_frame)
-	    binary_faces = {}
-	    index=0
-	    for index, face in enumerate(reference_faces):
-            start_x, start_y, end_x, end_y = map(int, face.bounding_box)
-            padding_x = int((end_x - start_x) * 0.25)
-            padding_y = int((end_y - start_y) * 0.25)
-            start_x = max(0, start_x - padding_x)
-            start_y = max(0, start_y - padding_y)
-            end_x = max(0, end_x + padding_x)
-            end_y = max(0, end_y + padding_y)
+          frame = get_video_frame(facefusion.globals.target_path, frame_number)
+          reference_faces = get_many_faces(vision_frame)
+          binary_faces = {}
+          index = 0
+	      for index, face in enumerate(reference_faces):
+	          start_x, start_y, end_x, end_y = map(int, face.bounding_box)
+	          padding_x = int((end_x - start_x) * 0.25)
+	          padding_y = int((end_y - start_y) * 0.25)
+	          start_x = max(0, start_x - padding_x)
+	          start_y = max(0, start_y - padding_y)
+	          end_x = max(0, end_x + padding_x)
+	          end_y = max(0, end_y + padding_y)
+	          crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
+	          crop_vision_frame = normalize_frame_color(crop_vision_frame)
+	          binary_face = frame_to_binary(crop_vision_frame)
+	          binary_faces[index] = binary_face
+	      return binary_faces
 
-            crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
-            crop_vision_frame = normalize_frame_color(crop_vision_frame)
-            binary_face = frame_to_binary(crop_vision_frame)
-            binary_faces[index] = binary_face
-        return binary_faces
-	if facefusion.globals.system_memory_limit > 0:
-		limit_system_memory(facefusion.globals.system_memory_limit)
-	if facefusion.globals.force_download:
-		force_download()
-		return
-	if not pre_check() or not content_analyser.pre_check() or not face_analyser.pre_check() or not face_masker.pre_check() or not voice_extractor.pre_check():
-		return
-	for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
-		if not frame_processor_module.pre_check():
-			return
-	if facefusion.globals.headless:
-		conditional_process()
-	else:
-		import facefusion.uis.core as ui
-
-		for ui_layout in ui.get_ui_layouts_modules(facefusion.globals.ui_layouts):
-			if not ui_layout.pre_check():
-				return
-		ui.launch()
+	  validate_args(program)
+	  apply_args(program,arg_list)
+	  logger.init(facefusion.globals.log_level)
+	  if facefusion.globals.system_memory_limit > 0:
+	  	  limit_system_memory(facefusion.globals.system_memory_limit)
+	  if facefusion.globals.force_download:
+	  	  force_download()
+	  	  return
+	  if not pre_check() or not content_analyser.pre_check() or not face_analyser.pre_check() or not face_masker.pre_check() or not voice_extractor.pre_check():
+	  	  return
+	  for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
+	  	  if not frame_processor_module.pre_check():
+	  	  	return
+	  if facefusion.globals.headless:
+	  	  conditional_process()
+	  else:
+	  	  import facefusion.uis.core as ui
+	  	  for ui_layout in ui.get_ui_layouts_modules(facefusion.globals.ui_layouts):
+	  	  	if not ui_layout.pre_check():
+	  	  		return
+	  	  ui.launch()
 
 
 def destroy() -> None:

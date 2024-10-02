@@ -329,7 +329,6 @@ def prepare_detect_frame(temp_vision_frame : VisionFrame, face_detector_size : s
 
 
 def create_face_by_base64(input_base64: str) -> Optional[Face]:
-    try:
         # 解码base64数据
         img_data = base64.b64decode(input_base64)
         nparr = np.frombuffer(img_data, np.uint8)

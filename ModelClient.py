@@ -38,13 +38,13 @@ class ModelClient:
         print('返回：',result)
 
 
-    def analyze_video(self, user_id, source_video_s3_path, frame_numer):
+    def analyze_video(self, user_id, source_video_s3_path, frame_number):
         job_id = f"{uuid.uuid4().hex}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
         # 触发调用 SageMaker endpoint
         inputs = ['-t',source_video_s3_path,
                   '--execution-providers','cuda',
-                  '--analyze',frame_number,
+                  '--analyze_index',frame_number,
                   '--headless']
         request = {
         	        "method":"analyze",
