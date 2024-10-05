@@ -102,10 +102,11 @@ def get_filename_from_s3_path(s3_path):
 
 def check_exsit_local_file(local_path):
 	tmp_dir = local_path
-	source_image_filename = get_filename_from_s3_path(facefusion.globals.source_paths)
-	source_image_file_full_path = os.path.join(tmp_dir, source_image_filename)
-	if os.path.isfile(source_image_file_full_path):
-		facefusion.globals.source_paths = source_image_file_full_path
+	if facefusion.globals.source_paths:
+	    source_image_filename = get_filename_from_s3_path(facefusion.globals.source_paths)
+	    source_image_file_full_path = os.path.join(tmp_dir, source_image_filename)
+	    if os.path.isfile(source_image_file_full_path):
+	    	facefusion.globals.source_paths = source_image_file_full_path
 	target_video_filename = get_filename_from_s3_path(facefusion.globals.target_path)
 	target_video_file_full_path = os.path.join(tmp_dir, target_video_filename)
 	if os.path.isfile(target_video_file_full_path):

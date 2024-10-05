@@ -1,5 +1,5 @@
 import os
-
+import cv2
 os.environ['OMP_NUM_THREADS'] = '1'
 import json
 import boto3
@@ -228,8 +228,8 @@ def frame_to_binary(frame: VisionFrame) -> bytes:
 
 def run(program : ArgumentParser,arg_list) -> None:
       ## if just analyze video frame, return the reference face image binary directly
-	  if "analyze_index" in arg_list:
-          index = arg_list.index("analyze_index")
+      if "--analyze_index" in arg_list:
+          index = arg_list.index("--analyze_index")
           if index + 1 < len(arg_list):
               frame_number = arg_list[index + 1]
               # Remove 'analyze_index' and its value from arg_list
@@ -238,11 +238,18 @@ def run(program : ArgumentParser,arg_list) -> None:
               print("Error: No value provided after 'analyze_index'")
               return
 
-          frame = get_video_frame(facefusion.globals.target_path, frame_number)
+
+          ### download face analyser specific models（yolo/yoloface）
+          force_download_specific_module(face_analyser)
+          apply_args(program,arg_list)
+
+          ### get target video's frame ,and use yolo to dectect reference faces
+          vision_frame = get_video_frame(facefusion.globals.target_path, frame_number)
           reference_faces = get_many_faces(vision_frame)
           binary_faces = {}
           index = 0
-	      for index, face in enumerate(reference_faces):
+          ### crop the reference faces
+          for index, face in enumerate(reference_faces):
 	          start_x, start_y, end_x, end_y = map(int, face.bounding_box)
 	          padding_x = int((end_x - start_x) * 0.25)
 	          padding_y = int((end_y - start_y) * 0.25)
@@ -252,31 +259,34 @@ def run(program : ArgumentParser,arg_list) -> None:
 	          end_y = max(0, end_y + padding_y)
 	          crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
 	          crop_vision_frame = normalize_frame_color(crop_vision_frame)
+	          print("here2===",crop_vision_frame)
 	          binary_face = frame_to_binary(crop_vision_frame)
+	          print("here3===")
 	          binary_faces[index] = binary_face
-	      return binary_faces
+          return binary_faces
 
-	  validate_args(program)
-	  apply_args(program,arg_list)
-	  logger.init(facefusion.globals.log_level)
-	  if facefusion.globals.system_memory_limit > 0:
-	  	  limit_system_memory(facefusion.globals.system_memory_limit)
-	  if facefusion.globals.force_download:
-	  	  force_download()
-	  	  return
-	  if not pre_check() or not content_analyser.pre_check() or not face_analyser.pre_check() or not face_masker.pre_check() or not voice_extractor.pre_check():
-	  	  return
-	  for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
-	  	  if not frame_processor_module.pre_check():
-	  	  	return
-	  if facefusion.globals.headless:
-	  	  conditional_process()
-	  else:
-	  	  import facefusion.uis.core as ui
-	  	  for ui_layout in ui.get_ui_layouts_modules(facefusion.globals.ui_layouts):
-	  	  	if not ui_layout.pre_check():
-	  	  		return
-	  	  ui.launch()
+
+      validate_args(program)
+      apply_args(program,arg_list)
+      logger.init(facefusion.globals.log_level)
+      if facefusion.globals.system_memory_limit > 0:
+      	  limit_system_memory(facefusion.globals.system_memory_limit)
+      if facefusion.globals.force_download:
+      	  force_download()
+      	  return
+      if not pre_check() or not content_analyser.pre_check() or not face_analyser.pre_check() or not face_masker.pre_check() or not voice_extractor.pre_check():
+      	  return
+      for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
+      	  if not frame_processor_module.pre_check():
+      	  	return
+      if facefusion.globals.headless:
+      	  conditional_process()
+      else:
+      	  import facefusion.uis.core as ui
+      	  for ui_layout in ui.get_ui_layouts_modules(facefusion.globals.ui_layouts):
+      	  	if not ui_layout.pre_check():
+      	  		return
+      	  ui.launch()
 
 
 def destroy() -> None:
@@ -325,15 +335,16 @@ def download_from_s3(source_s3_url,local_file_path):
 
 def pre_download()-> None:
     updated_paths: List[str] = []
-    for path in facefusion.globals.source_paths:
-        if path.startswith("s3://"):
-            file_name = os.path.basename(path)
-            download_file = os.path.join("/tmp", file_name)
-            download_from_s3(path, download_file)
-            updated_paths.append(download_file)
-        else:
-            updated_paths.append(path)
-    facefusion.globals.source_paths = updated_paths
+    if facefusion.globals.source_paths:
+        for path in facefusion.globals.source_paths:
+            if path.startswith("s3://"):
+                file_name = os.path.basename(path)
+                download_file = os.path.join("/tmp", file_name)
+                download_from_s3(path, download_file)
+                updated_paths.append(download_file)
+            else:
+                updated_paths.append(path)
+        facefusion.globals.source_paths = updated_paths
     if "s3" in  facefusion.globals.target_path:
         file_name = os.path.basename(facefusion.globals.target_path)
         download_file = "/tmp/"+file_name
@@ -408,6 +419,14 @@ def force_download() -> None:
 	model_urls = [ models[model].get('url') for models in model_list for model in models ]
 	conditional_download(download_directory_path, model_urls)
 
+def force_download_specific_module(module) -> None:
+	download_directory_path = resolve_relative_path('../.assets/models')
+	model_list =\
+	[
+		module.MODELS
+	]
+	model_urls = [ models[model].get('url') for models in model_list for model in models ]
+	conditional_download(download_directory_path, model_urls)
 
 def process_image(start_time : float) -> None:
 	normed_output_path = normalize_output_path(facefusion.globals.target_path, facefusion.globals.output_path)

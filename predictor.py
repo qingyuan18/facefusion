@@ -43,7 +43,6 @@ def transformation():
     input_json = flask.request.get_json()
     if input_json['method']=="analyze":
         args = input_json['input']
-        print(args)
         reference_faces=core.cli(args)
         encoded_faces = {k: base64.b64encode(v).decode('utf-8') for k, v in reference_faces.items()}
         result = {"encoded_faces":encoded_faces}
