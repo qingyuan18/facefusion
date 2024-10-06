@@ -50,7 +50,7 @@ class ModelClient:
         	        "method":"analyze",
         	        "input":inputs,
                     }
-        response = self.invoke_endpoint(request,content_type="application/jpeg")
+        response = self.invoke_endpoint(request,content_type="application/json")
         return response['Body'].read().decode("UTF-8")
 
 

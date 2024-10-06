@@ -120,7 +120,7 @@ def cli(arg_list) -> None:
 	group_uis = program.add_argument_group('uis')
 	group_uis.add_argument('--open-browser', help=wording.get('help.open_browser'), action = 'store_true', default = config.get_bool_value('uis.open_browser'))
 	group_uis.add_argument('--ui-layouts', help = wording.get('help.ui_layouts').format(choices = ', '.join(available_ui_layouts)), default = config.get_str_list('uis.ui_layouts', 'default'), nargs = '+')
-	run(program,arg_list)
+	return run(program,arg_list)
 
 
 def apply_config(program : ArgumentParser) -> None:
@@ -226,6 +226,8 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 def frame_to_binary(frame: VisionFrame) -> bytes:
     return cv2.imencode('.png', frame)[1].tobytes()
 
+
+
 def run(program : ArgumentParser,arg_list) -> None:
       ## if just analyze video frame, return the reference face image binary directly
       if "--analyze_index" in arg_list:
@@ -259,13 +261,15 @@ def run(program : ArgumentParser,arg_list) -> None:
 	          end_y = max(0, end_y + padding_y)
 	          crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
 	          crop_vision_frame = normalize_frame_color(crop_vision_frame)
-	          print("here2===",crop_vision_frame)
+	          #print("here2===",crop_vision_frame)
 	          binary_face = frame_to_binary(crop_vision_frame)
-	          print("here3===")
+	          #print("here3===",binary_face)
 	          binary_faces[index] = binary_face
+	          #print("here4===",len(binary_faces))
           return binary_faces
 
 
+      print("here5===")
       validate_args(program)
       apply_args(program,arg_list)
       logger.init(facefusion.globals.log_level)

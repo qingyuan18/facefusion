@@ -44,8 +44,12 @@ def transformation():
     if input_json['method']=="analyze":
         args = input_json['input']
         reference_faces=core.cli(args)
+        ## base64 or raw binary data return
         encoded_faces = {k: base64.b64encode(v).decode('utf-8') for k, v in reference_faces.items()}
         result = {"encoded_faces":encoded_faces}
+        ## if use base64 ， http need to decode
+        #encoded_faces = {k: base64.b64encode(v) for k, v in reference_faces.items()}
+        #result = {"encoded_faces":encoded_faces}
 
     elif input_json['method']=="submit":
         args = input_json['input']
