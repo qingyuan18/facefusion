@@ -4,7 +4,16 @@ import boto3
 import os
 from datetime import datetime
 import json
+import base64
+
 runtime_sm_client = boto3.client(service_name="sagemaker-runtime")
+
+
+class BytesEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, bytes):
+            return base64.b64encode(obj).decode('utf-8')
+        return super().default(obj)
 
 class ModelClient:
     sagemaker_endpoint = ""
@@ -67,7 +76,7 @@ class ModelClient:
                   '--execution-providers','cuda',
                   '-o','/opt/program/output/'+output_video_name,'-u',output_video_s3_path,'--headless']
         if faces_mapping_dict:
-            inputs.append(['--many',json.dumps(faces_mapping_dict)])
+            inputs.append(['--many',json.dumps(faces_mapping_dict, cls=BytesEncoder)])
         request = {
         	        "method":"submit",
         	        "input":inputs,

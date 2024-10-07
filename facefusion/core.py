@@ -3,6 +3,7 @@ import cv2
 os.environ['OMP_NUM_THREADS'] = '1'
 import json
 import boto3
+import base64
 import signal
 import sys
 import warnings
@@ -41,6 +42,11 @@ def get_bucket_and_key(s3uri):
     key = s3uri[pos + 1 : ]
     return bucket, key
 
+class BytesEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, bytes):
+            return base64.b64encode(obj).decode('utf-8')
+        return super().default(obj)
 
 def cli(arg_list) -> None:
 	#signal.signal(signal.SIGINT, lambda signal_number, frame: destroy())
@@ -269,7 +275,6 @@ def run(program : ArgumentParser,arg_list) -> None:
           return binary_faces
 
 
-      print("here5===")
       validate_args(program)
       apply_args(program,arg_list)
       logger.init(facefusion.globals.log_level)
@@ -334,8 +339,10 @@ def download_from_s3(source_s3_url,local_file_path):
         s3.download_file(bucket_name, s3_file_path, local_file_path)
         print(f'文件 {s3_file_path} 已下载到 {local_file_path}')
     except Exception as e:
-        print(f'下载失败: {e}')
+        print(f'下载失败: {source_s3_url} {e}')
 
+def decode_dict(d):
+    return {int(k): base64.b64decode(v) if isinstance(v, str) else v for k, v in d.items()}
 
 def pre_download()-> None:
     updated_paths: List[str] = []
@@ -355,21 +362,30 @@ def pre_download()-> None:
         download_from_s3(facefusion.globals.target_path,"/tmp/"+file_name)
         facefusion.globals.target_path = "/tmp/"+file_name
     if os.environ.get("faces_mapping"):
-        faces_mapping_json = json.loads(os.environ["faces_mapping"])
+        # 从 JSON 字符串解析,并还原为bytes二进制的reference image值
+        #print(os.environ.get("faces_mapping"))
+        faces_mapping_path = os.environ.get("faces_mapping")
+        faces_mapping_path = faces_mapping_path.lstrip('@')
+        with open(faces_mapping_path, 'r') as file:
+            faces_mapping_content = file.read()
+        parsed_dict = json.loads(faces_mapping_content)
+        faces_mapping_json = decode_dict(parsed_dict)
+        #print("here1==",type(faces_mapping_json[0]))
+
         for key, value in faces_mapping_json.items():
-            if "s3" in key:
+            if type(key)=="str" and "s3" in key:
                 file_name = os.path.basename(key)
                 download_file = "/tmp/" + file_name
                 download_from_s3(key, download_file)
                 faces_mapping_json["/tmp/" + file_name] = faces_mapping_json.pop(key)
 
-            if "s3" in value:
+            if type(value)=="str" and "s3" in value:
                 file_name = os.path.basename(value)
                 download_file = "/tmp/" + file_name
                 download_from_s3(value, download_file)
                 faces_mapping_json[key] = "/tmp/" + file_name
-        # 更新环境变量中的 faces_mapping
-        os.environ["faces_mapping"] = json.dumps(faces_mapping_json)
+            # 更新环境变量中的 faces_mapping
+        os.environ["faces_mapping"] = json.dumps(faces_mapping_json,cls=BytesEncoder)
 
 def conditional_process() -> None:
 	start_time = time()

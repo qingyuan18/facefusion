@@ -363,7 +363,9 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 	source_faces_inputs = []
 	faces_mapping_json = {}
 	if os.environ.get("faces_mapping"):
+	   print("here2====")
 	   faces_mapping_json = json.loads(os.environ["faces_mapping"])
+	   print("here3====")
 	   source_frames_inputs = read_static_images(source_paths)
 	   for source_frames_input in source_frames_inputs:
 	       source_faces_inputs.append(get_average_face(source_frames_input))
