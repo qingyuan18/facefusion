@@ -364,28 +364,16 @@ def pre_download()-> None:
     if os.environ.get("faces_mapping"):
         # 从 JSON 字符串解析,并还原为bytes二进制的reference image值
         #print(os.environ.get("faces_mapping"))
-        faces_mapping_path = os.environ.get("faces_mapping")
-        faces_mapping_path = faces_mapping_path.lstrip('@')
-        with open(faces_mapping_path, 'r') as file:
-            faces_mapping_content = file.read()
-        parsed_dict = json.loads(faces_mapping_content)
-        faces_mapping_json = decode_dict(parsed_dict)
-        #print("here1==",type(faces_mapping_json[0]))
+        faces_mapping_s3_path = os.environ.get("faces_mapping")
 
-        for key, value in faces_mapping_json.items():
-            if type(key)=="str" and "s3" in key:
-                file_name = os.path.basename(key)
-                download_file = "/tmp/" + file_name
-                download_from_s3(key, download_file)
-                faces_mapping_json["/tmp/" + file_name] = faces_mapping_json.pop(key)
+        if "s3" in faces_mapping_s3_path:
+            file_name = os.path.basename(faces_mapping_s3_path)
+            download_file = "/tmp/" + file_name
+            download_from_s3(faces_mapping_s3_path, download_file)
+            # 更新环境变量中的 faces_mapping为本地路径文件
+            #print("here1==",download_file)
+            os.environ["faces_mapping"] = download_file
 
-            if type(value)=="str" and "s3" in value:
-                file_name = os.path.basename(value)
-                download_file = "/tmp/" + file_name
-                download_from_s3(value, download_file)
-                faces_mapping_json[key] = "/tmp/" + file_name
-            # 更新环境变量中的 faces_mapping
-        os.environ["faces_mapping"] = json.dumps(faces_mapping_json,cls=BytesEncoder)
 
 def conditional_process() -> None:
 	start_time = time()

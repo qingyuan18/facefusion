@@ -331,7 +331,7 @@ def prepare_detect_frame(temp_vision_frame : VisionFrame, face_detector_size : s
 def create_face_by_base64(input_base64: str) -> Optional[Face]:
         # 解码base64数据
         img_data = base64.b64decode(input_base64)
-        nparr = np.frombuffer(img_data, np.uint8)
+        nparr = numpy.frombuffer(img_data, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if image is None:

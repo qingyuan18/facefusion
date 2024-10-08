@@ -1,6 +1,8 @@
 from typing import Any, List, Literal, Optional
 from argparse import ArgumentParser
 from time import sleep
+import json
+import base64
 import numpy
 import onnx
 import onnxruntime
@@ -10,7 +12,7 @@ import facefusion.globals
 import facefusion.processors.frame.core as frame_processors
 from facefusion import config, process_manager, logger, wording
 from facefusion.execution import has_execution_provider, apply_execution_provider_options
-from facefusion.face_analyser import get_one_face, get_average_face, get_many_faces,create_face_by_input, find_similar_faces, clear_face_analyser
+from facefusion.face_analyser import compare_faces, get_one_face, get_average_face, get_many_faces,create_face_by_base64, find_similar_faces, clear_face_analyser
 from facefusion.face_masker import create_static_box_mask, create_occlusion_mask, create_region_mask, clear_face_occluder, clear_face_parser
 from facefusion.face_helper import warp_face_by_face_landmark_5, paste_back
 from facefusion.face_store import get_reference_faces
@@ -93,6 +95,8 @@ MODELS : ModelSet =\
 }
 OPTIONS : Optional[OptionsWithModel] = None
 
+def decode_dict(d):
+    return {int(k): base64.b64decode(v) if isinstance(v, str) else v for k, v in d.items()}
 
 def get_filename_from_s3_path(s3_path):
 	s3_path = s3_path[0].replace("s3://", "")
@@ -356,6 +360,7 @@ def process_frame(inputs : FaceSwapperInputs) -> VisionFrame:
 
 
 def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload], update_progress : UpdateProgress) -> None:
+	print("here4===",facefusion.globals.face_selector_mode)
 	reference_faces = get_reference_faces() if 'reference' in facefusion.globals.face_selector_mode else None
 	source_frames = read_static_images(source_paths)
 	source_face = get_average_face(source_frames)
@@ -363,12 +368,16 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 	source_faces_inputs = []
 	faces_mapping_json = {}
 	if os.environ.get("faces_mapping"):
-	   print("here2====")
-	   faces_mapping_json = json.loads(os.environ["faces_mapping"])
-	   print("here3====")
-	   source_frames_inputs = read_static_images(source_paths)
-	   for source_frames_input in source_frames_inputs:
-	       source_faces_inputs.append(get_average_face(source_frames_input))
+		faces_mapping_file_path = os.environ["faces_mapping"]
+		# 读取文件内容
+		with open(faces_mapping_file_path, 'r') as file:
+		    faces_mapping_content = file.read()
+		# 解析 JSON 内容
+		faces_mapping_json = json.loads(faces_mapping_content)
+		faces_mapping_json = decode_dict(faces_mapping_json)
+		source_frames_inputs = read_static_images(source_paths)
+		for source_frames_input in source_frames_inputs:
+		    source_faces_inputs.append(get_average_face(source_frames_input))
 
 	for queue_payload in process_manager.manage(queue_payloads):
 		target_vision_path = queue_payload['frame_path']
@@ -376,19 +385,21 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		if os.environ.get("faces_mapping"):
 		    for index, source_face in enumerate(source_faces_inputs):
 		        ## opt1 : use mapping index of reference image
-		        reference_faces_index = faces_mapping_json[index]
-		        target_vision_frame = process_frame(
-		        {
-		    	    'reference_faces': [reference_faces[reference_faces_index]],
-		    	    'source_face': source_face,
-		    	    'target_vision_frame': target_vision_frame
-		        })
+		        #reference_faces_index = faces_mapping_json[index]
+		        #target_vision_frame = process_frame(
+		        #{
+		    	#    'reference_faces': [reference_faces[reference_faces_index]],
+		    	#    'source_face': source_face,
+		    	#    'target_vision_frame': target_vision_frame
+		        #})
 		        ## opt2: use base64 mapping image
 		        reference_faces_refind=[]
 		        reference_face_input = create_face_by_base64(faces_mapping_json[index])
 		        for reference_face in reference_faces:
+		            print("here4===")
 		            ### find the simlilar reference face from frame
 		            if compare_faces(reference_face, reference_face_input, facefusion.globals.reference_face_distance):
+		                print("here5===",reference_face)
 		                reference_faces_refind.append(reference_face)
 		        target_vision_frame = process_frame(
                 {

@@ -76,7 +76,16 @@ class ModelClient:
                   '--execution-providers','cuda',
                   '-o','/opt/program/output/'+output_video_name,'-u',output_video_s3_path,'--headless']
         if faces_mapping_dict:
-            inputs.append(['--many',json.dumps(faces_mapping_dict, cls=BytesEncoder)])
+            s3_client = boto3.client('s3')
+            temp_file_path = f"/tmp/{job_id}_faces_mapping.json"
+            with open(temp_file_path, 'w') as f:
+                json.dump(faces_mapping_dict, f, cls=BytesEncoder)
+            # 上传文件到 S3
+            faces_mapping_s3_key = f"{output_video_s3_dir}/{job_id}_faces_mapping.json"
+            s3_bucket, key = self.get_bucket_and_key(faces_mapping_s3_key)
+            s3_client.upload_file(temp_file_path, s3_bucket, key)
+            # 参数传 face mapping的s3路径
+            inputs.append(['--many',faces_mapping_s3_key)
         request = {
         	        "method":"submit",
         	        "input":inputs,
