@@ -375,9 +375,10 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		faces_mapping_json = json.loads(faces_mapping_content)
 		faces_mapping_json = decode_dict(faces_mapping_json)
 
-		source_frames_inputs = read_static_images(source_paths)
+		source_frames_inputs = source_frames
 		for source_frames_input in source_frames_inputs:
-		    source_faces_inputs.append(get_average_face(source_frames_input))
+		    face = get_average_face([source_frames_input])
+		    source_faces_inputs.append(face)
 
 	for queue_payload in process_manager.manage(queue_payloads):
 		target_vision_path = queue_payload['frame_path']
@@ -403,15 +404,15 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		                # 用新的列表替换原来的 reference_faces[key]
 		                reference_faces[key] = faces_to_keep
 
+		        #print("here6===",source_face)
 		        target_vision_frame = process_frame(
                 {
                 	'reference_faces': reference_faces,
                 	'source_face': source_face,
                 	'target_vision_frame': target_vision_frame
                 })
-
-		    output_vision_frame =  target_vision_frame
-		    write_image(target_vision_path, output_vision_frame)
+		        output_vision_frame =  target_vision_frame
+		        write_image(target_vision_path, output_vision_frame)
 		else:
 		    output_vision_frame = process_frame(
 		    {
