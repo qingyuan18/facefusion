@@ -405,7 +405,7 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 
 		        target_vision_frame = process_frame(
                 {
-                	'reference_faces': reference_faces_refind,
+                	'reference_faces': reference_faces,
                 	'source_face': source_face,
                 	'target_vision_frame': target_vision_frame
                 })
