@@ -338,9 +338,9 @@ def create_face_by_base64(input_base64) -> Optional[Face]:
             print("Warning: Unable to decode image from base64 data")
             return None
 
-        output_path = '/tmp/input_base64.png'
-        cv2.imwrite(output_path, image)
-        print(f"Image saved to {output_path}")
+        #output_path = '/tmp/input_base64.png'
+        #cv2.imwrite(output_path, image)
+        #print(f"Image saved to {output_path}")
 
 
         # 转换为VisionFrame格式
