@@ -328,65 +328,49 @@ def prepare_detect_frame(temp_vision_frame : VisionFrame, face_detector_size : s
 	return detect_vision_frame
 
 
-def create_face_by_base64(input_base64: str) -> Optional[Face]:
-        # 解码base64数据
-        img_data = base64.b64decode(input_base64)
-        nparr = numpy.frombuffer(img_data, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+def create_face_by_base64(input_base64) -> Optional[Face]:
+        # 已经是解码后的base64编码的字符串数据
+        #img_data = base64.b64decode(input_base64)
+        nparr = numpy.frombuffer(input_base64, numpy.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
 
         if image is None:
             print("Warning: Unable to decode image from base64 data")
             return None
 
+        output_path = '/tmp/input_base64.png'
+        cv2.imwrite(output_path, image)
+        print(f"Image saved to {output_path}")
+
+
         # 转换为VisionFrame格式
-        vision_frame: VisionFrame = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        face_landmark_68, face_landmark_68_score = detect_face_landmark_68(vision_frame)
+        #vision_frame: VisionFrame = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        vision_frame: VisionFrame = image
+        # 使用整个图像作为bounding box
+        #height, width = vision_frame.shape[:2]
+        #bounding_box = numpy.array([0, 0, width, height])
+        #bounding_box_list = [bounding_box]
 
-        if face_landmark_68 is None or face_landmark_68_score < facefusion.globals.face_landmarker_score:
-            print("Warning: No valid face landmarks detected in the image")
-            return None
+        bounding_box_list_yunet, face_landmark_5_list_yunet, score_list_yunet = detect_with_yoloface(vision_frame, facefusion.globals.face_detector_size)
+        #print("here1=== ",bounding_box_list_yunet)
+        #face_landmark_68, face_landmark_68_score = detect_face_landmark_68(vision_frame,face_landmark_5_list_yunet)
+        return create_faces(vision_frame,bounding_box_list_yunet,face_landmark_5_list_yunet,score_list_yunet)[0]
 
-        embedding, normed_embedding = calc_embedding(vision_frame, landmarks.get('5/68'))
-        gender, age = detect_gender_age(vision_frame, bounding_box)
 
-        face = Face(
-            embedding=embedding,
-            normed_embedding=normed_embedding,
-            gender=gender,
-            age=age
-        )
 
-        return face
+        #embedding, normed_embedding = calc_embedding(vision_frame, face_landmark_68)
+        #gender, age = detect_gender_age(vision_frame, bounding_box)
+#
+        #face = Face(
+        #    embedding=embedding,
+        #    normed_embedding=normed_embedding,
+        #    gender=gender,
+        #    age=age
+        #)
+        #print("here0=== ",face)
+#
+        #return face
 
-def create_face_by_input(input_path: str) -> Optional[Face]:
-    if not os.path.isfile(input_path):
-        print(f"Warning: File not found - {input_path}")
-        return None
-
-    # 读取图像并转换为VisionFrame格式
-    image = cv2.imread(input_path)
-    if image is None:
-        print(f"Warning: Unable to read image - {input_path}")
-        return None
-
-    vision_frame: VisionFrame = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    face_landmark_68, face_landmark_68_score = detect_face_landmark_68(vision_frame)
-
-    if face_landmark_68 is None or face_landmark_68_score < facefusion.globals.face_landmarker_score:
-        print(f"Warning: No valid face landmarks detected in - {input_path}")
-        return None
-
-    embedding, normed_embedding = calc_embedding(vision_frame, landmarks.get('5/68'))
-    gender, age = detect_gender_age(vision_frame, bounding_box)
-
-    face = Face(
-        embedding=embedding,
-        normed_embedding=normed_embedding,
-        gender=gender,
-        age=age
-    )
-
-    return face
 
 
 def create_faces(vision_frame : VisionFrame, bounding_box_list : List[BoundingBox], face_landmark_5_list : List[FaceLandmark5], score_list : List[Score]) -> List[Face]:

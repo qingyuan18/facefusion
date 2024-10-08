@@ -360,7 +360,6 @@ def process_frame(inputs : FaceSwapperInputs) -> VisionFrame:
 
 
 def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload], update_progress : UpdateProgress) -> None:
-	print("here4===",facefusion.globals.face_selector_mode)
 	reference_faces = get_reference_faces() if 'reference' in facefusion.globals.face_selector_mode else None
 	source_frames = read_static_images(source_paths)
 	source_face = get_average_face(source_frames)
@@ -372,9 +371,10 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		# 读取文件内容
 		with open(faces_mapping_file_path, 'r') as file:
 		    faces_mapping_content = file.read()
-		# 解析 JSON 内容
+		# 解析 JSON 内容并解码器
 		faces_mapping_json = json.loads(faces_mapping_content)
 		faces_mapping_json = decode_dict(faces_mapping_json)
+
 		source_frames_inputs = read_static_images(source_paths)
 		for source_frames_input in source_frames_inputs:
 		    source_faces_inputs.append(get_average_face(source_frames_input))
@@ -384,23 +384,25 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		target_vision_frame = read_image(target_vision_path)
 		if os.environ.get("faces_mapping"):
 		    for index, source_face in enumerate(source_faces_inputs):
-		        ## opt1 : use mapping index of reference image
-		        #reference_faces_index = faces_mapping_json[index]
-		        #target_vision_frame = process_frame(
-		        #{
-		    	#    'reference_faces': [reference_faces[reference_faces_index]],
-		    	#    'source_face': source_face,
-		    	#    'target_vision_frame': target_vision_frame
-		        #})
-		        ## opt2: use base64 mapping image
 		        reference_faces_refind=[]
 		        reference_face_input = create_face_by_base64(faces_mapping_json[index])
-		        for reference_face in reference_faces:
-		            print("here4===")
-		            ### find the simlilar reference face from frame
-		            if compare_faces(reference_face, reference_face_input, facefusion.globals.reference_face_distance):
-		                print("here5===",reference_face)
-		                reference_faces_refind.append(reference_face)
+		        for key in reference_faces:
+		            if "swapper" in key:
+		                reference_faces_originals = reference_faces[key]
+		                #print("here4=== ",type(reference_faces_originals))
+		                # 创建一个新列表来存储要保留的 faces
+		                faces_to_keep = []
+		                for reference_faces_original in reference_faces_originals:
+		                    ### find the similar reference face from frame
+		                    if compare_faces(reference_faces_original, reference_face_input, facefusion.globals.reference_face_distance):
+		                        print("here5===")
+		                        faces_to_keep.append(reference_faces_original)
+		                    else:
+		                        # 如果 compare_faces 返回 False，不将该 face 添加到 faces_to_keep
+		                        pass
+		                # 用新的列表替换原来的 reference_faces[key]
+		                reference_faces[key] = faces_to_keep
+
 		        target_vision_frame = process_frame(
                 {
                 	'reference_faces': reference_faces_refind,

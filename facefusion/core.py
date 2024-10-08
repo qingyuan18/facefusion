@@ -267,11 +267,8 @@ def run(program : ArgumentParser,arg_list) -> None:
 	          end_y = max(0, end_y + padding_y)
 	          crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
 	          crop_vision_frame = normalize_frame_color(crop_vision_frame)
-	          #print("here2===",crop_vision_frame)
 	          binary_face = frame_to_binary(crop_vision_frame)
-	          #print("here3===",binary_face)
 	          binary_faces[index] = binary_face
-	          #print("here4===",len(binary_faces))
           return binary_faces
 
 
@@ -548,7 +545,7 @@ def process_video(start_time : float) -> None:
 					return
 				logger.warn(wording.get('restoring_audio_skipped'), __name__.upper())
 				move_temp(facefusion.globals.target_path, normed_output_path)
-	print("here1==",normed_output_path)
+	#print("here1==",normed_output_path)
 	write_to_s3(normed_output_path,facefusion.globals.s3_output_path)
 	# clear temp
 	logger.info(wording.get('clearing_temp'), __name__.upper())

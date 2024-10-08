@@ -86,6 +86,7 @@ class ModelClient:
             s3_client.upload_file(temp_file_path, s3_bucket, key)
             # 参数传 face mapping的s3路径
             inputs.append(['--many',faces_mapping_s3_key)
+            inputs.append(['--face-selector-mode','reference'])
         request = {
         	        "method":"submit",
         	        "input":inputs,
