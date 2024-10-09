@@ -353,8 +353,8 @@ def create_face_by_base64(input_base64) -> Optional[Face]:
 
         bounding_box_list_yunet, face_landmark_5_list_yunet, score_list_yunet = detect_with_yoloface(vision_frame, facefusion.globals.face_detector_size)
         #print("here1=== ",bounding_box_list_yunet)
-        #face_landmark_68, face_landmark_68_score = detect_face_landmark_68(vision_frame,face_landmark_5_list_yunet)
-        return create_faces(vision_frame,bounding_box_list_yunet,face_landmark_5_list_yunet,score_list_yunet)[0]
+        #return create_faces(vision_frame,bounding_box_list_yunet,face_landmark_5_list_yunet,score_list_yunet)[0]
+        return get_one_face(vision_frame,0)
 
 
 

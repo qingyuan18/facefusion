@@ -230,6 +230,8 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 
 
 def frame_to_binary(frame: VisionFrame) -> bytes:
+    if frame.dtype != numpy.uint8:
+        frame = (frame * 255).astype(numpy.uint8)
     return cv2.imencode('.png', frame)[1].tobytes()
 
 
@@ -253,7 +255,10 @@ def run(program : ArgumentParser,arg_list) -> None:
 
           ### get target video's frame ,and use yolo to dectect reference faces
           vision_frame = get_video_frame(facefusion.globals.target_path, frame_number)
+          #print(f"here0===, type:{type(vision_frame)}, shape:{vision_frame.shape}, {vision_frame}")
           reference_faces = get_many_faces(vision_frame)
+          #print("here1===",type(reference_faces))
+          #print("here2===",reference_faces[0])
           binary_faces = {}
           index = 0
           ### crop the reference faces
@@ -266,7 +271,7 @@ def run(program : ArgumentParser,arg_list) -> None:
 	          end_x = max(0, end_x + padding_x)
 	          end_y = max(0, end_y + padding_y)
 	          crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
-	          crop_vision_frame = normalize_frame_color(crop_vision_frame)
+	          #crop_vision_frame = normalize_frame_color(crop_vision_frame)
 	          binary_face = frame_to_binary(crop_vision_frame)
 	          binary_faces[index] = binary_face
           return binary_faces
