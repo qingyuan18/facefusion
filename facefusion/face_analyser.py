@@ -587,6 +587,7 @@ def find_similar_faces(reference_faces : FaceSet, vision_frame : VisionFrame, fa
 
 def compare_faces(face : Face, reference_face : Face, face_distance : float) -> bool:
 	current_face_distance = calc_face_distance(face, reference_face)
+	print("face_distance",current_face_distance)
 	return current_face_distance < face_distance
 
 

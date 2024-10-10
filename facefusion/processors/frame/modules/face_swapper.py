@@ -388,7 +388,8 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		        reference_faces_refind=[]
 		        reference_face_input = create_face_by_base64(faces_mapping_json[index])
 		        for key in reference_faces:
-		            if "swapper" in key:
+		            #if "swapper" in key:
+		            if "origin" in key:
 		                reference_faces_originals = reference_faces[key]
 		                #print("here4=== ",type(reference_faces_originals))
 		                # 创建一个新列表来存储要保留的 faces

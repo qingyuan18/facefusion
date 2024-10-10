@@ -401,8 +401,12 @@ def conditional_append_reference_faces() -> None:
 			reference_frame = get_video_frame(facefusion.globals.target_path, facefusion.globals.reference_frame_number)
 		else:
 			reference_frame = read_image(facefusion.globals.target_path)
-		reference_face = get_one_face(reference_frame, facefusion.globals.reference_face_position)
-		append_reference_face('origin', reference_face)
+		if os.environ.get("faces_mapping"):
+			reference_face = get_one_face(reference_frame, facefusion.globals.reference_face_position)
+			append_reference_face('origin', reference_face)
+		else:
+			reference_faces = get_many_faces(reference_frame)
+            append_reference_face('origin', reference_faces)
 		if source_face and reference_face:
 			for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
 				abstract_reference_frame = frame_processor_module.get_reference_frame(source_face, reference_face, reference_frame)
