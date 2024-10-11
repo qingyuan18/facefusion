@@ -385,34 +385,32 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		target_vision_frame = read_image(target_vision_path)
 		if os.environ.get("faces_mapping"):
 		    for index, source_face in enumerate(source_faces_inputs):
-		        reference_faces_refind=[]
 		        reference_face_input = create_face_by_base64(faces_mapping_json[index])
 		        for key in reference_faces:
 		            #if "swapper" in key:
-		            if "origin" in key:
-		                reference_faces_originals = reference_faces[key]
-		                #print("here4=== ",type(reference_faces_originals))
-		                # 创建一个新列表来存储要保留的 faces
-		                faces_to_keep = []
-		                for reference_faces_original in reference_faces_originals:
-		                    ### find the similar reference face from frame
-		                    if compare_faces(reference_faces_original, reference_face_input, facefusion.globals.reference_face_distance):
-		                        print("here5===")
-		                        faces_to_keep.append(reference_faces_original)
-		                    else:
-		                        # 如果 compare_faces 返回 False，不将该 face 添加到 faces_to_keep
-		                        pass
-		                # 用新的列表替换原来的 reference_faces[key]
-		                reference_faces[key] = faces_to_keep
+		            #if "origin" in key:
+		            reference_faces_originals = reference_faces[key]
+		            print("here3=== ",len(reference_faces_originals))
+		            # 创建一个新列表来存储要保留的 faces
+		            faces_to_keep = []
+		            for reference_faces_original in reference_faces_originals:
+		                ### find the similar reference face from frame
+		                if compare_faces(reference_faces_original, reference_face_input, facefusion.globals.reference_face_distance):
+		                    print("here5===")
+		                    faces_to_keep.append(reference_faces_original)
+		                else:
+		                    # 如果 compare_faces 返回 False，不将该 face 添加到 faces_to_keep
+		                    pass
+		            # 用新的列表替换原来的 reference_faces[key]
+		            reference_faces[key] = faces_to_keep
 
 		        #print("here6===",source_face)
-		        target_vision_frame = process_frame(
+		        output_vision_frame = process_frame(
                 {
                 	'reference_faces': reference_faces,
                 	'source_face': source_face,
                 	'target_vision_frame': target_vision_frame
                 })
-		        output_vision_frame =  target_vision_frame
 		        write_image(target_vision_path, output_vision_frame)
 		else:
 		    output_vision_frame = process_frame(
