@@ -66,15 +66,18 @@ class ModelClient:
 
 
 
-    def submit_job(self, user_id, source_video_s3_path, swap_face_image_s3_path, output_video_s3_dir,faces_mapping_dict):
+    def submit_job(self, user_id, source_video_s3_path, swap_face_image_s3_paths, output_video_s3_dir,faces_mapping_dict):
         job_id = f"{uuid.uuid4().hex}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         output_video_name = f"{job_id}.mp4"
         output_video_s3_path = output_video_s3_dir+"/"+output_video_name
 
         # 触发调用 SageMaker endpoint
-        inputs = ['-s',swap_face_image_s3_path,'-t',source_video_s3_path,
+        inputs = ['-t',source_video_s3_path,
                   '--execution-providers','cuda',
                   '-o','/opt/program/output/'+output_video_name,'-u',output_video_s3_path,'--headless']
+        for swap_face_image_s3_path in swap_face_image_s3_paths:
+            inputs.append(['-s',swap_face_image_s3_path])
+
         if faces_mapping_dict:
             s3_client = boto3.client('s3')
             temp_file_path = f"/tmp/{job_id}_faces_mapping.json"

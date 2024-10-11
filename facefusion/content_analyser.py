@@ -96,6 +96,7 @@ def analyse_image(image_path : str) -> bool:
 def analyse_video(video_path : str, start_frame : int, end_frame : int) -> bool:
 	video_frame_total = count_video_frame_total(video_path)
 	video_fps = detect_video_fps(video_path)
+	print("video_fps===",video_fps)
 	frame_range = range(start_frame or 0, end_frame or video_frame_total)
 	rate = 0.0
 	counter = 0

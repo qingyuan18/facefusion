@@ -390,7 +390,7 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		            #if "swapper" in key:
 		            #if "origin" in key:
 		            reference_faces_originals = reference_faces[key]
-		            print("here3=== ",len(reference_faces_originals))
+		            print("here3=== reference face key:", key,len(reference_faces_originals))
 		            # 创建一个新列表来存储要保留的 faces
 		            faces_to_keep = []
 		            for reference_faces_original in reference_faces_originals:
