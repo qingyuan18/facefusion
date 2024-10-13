@@ -390,7 +390,7 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 		        #print("here3=== 开始换第",index," 张脸")
 		        reference_faces_copy = copy.deepcopy(reference_faces)
 		        for key in reference_faces_copy:
-		            print("here1=== ",key)
+		            #print("here1=== ",key)
 		            #if "swapper" in key:
 		            #if "origin" in key:
 		            reference_faces_originals = reference_faces_copy[key]
