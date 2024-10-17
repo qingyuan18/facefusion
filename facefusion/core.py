@@ -15,7 +15,6 @@ from argparse import ArgumentParser, HelpFormatter
 import io
 import facefusion.choices
 import facefusion.globals
-from facefusion.face_analyser import get_one_face, get_average_face
 from facefusion.face_store import get_reference_faces, append_reference_face
 from facefusion import face_analyser, face_masker, content_analyser, config, process_manager, metadata, logger, wording, voice_extractor
 from facefusion.content_analyser import analyse_image, analyse_video
@@ -30,7 +29,7 @@ from facefusion.typing import Face, Embedding, VisionFrame
 from facefusion.filesystem import get_temp_frame_paths, get_temp_file_path, create_temp, move_temp, clear_temp, is_image, is_video, filter_audio_paths, resolve_relative_path, list_directory
 from facefusion.ffmpeg import extract_frames, merge_video, copy_image, finalize_image, restore_audio, replace_audio
 from facefusion.vision import read_image, read_static_images, detect_image_resolution, restrict_video_fps, create_image_resolutions, get_video_frame, detect_video_resolution, detect_video_fps, restrict_video_resolution, restrict_image_resolution, create_video_resolutions, pack_resolution, unpack_resolution
-from facefusion.face_analyser import get_one_face, get_many_faces
+from facefusion.face_analyser import get_one_face, get_many_faces,clear_face_analyser,get_average_face
 from facefusion.vision import get_video_frame, read_static_image, normalize_frame_color
 
 onnxruntime.set_default_logger_severity(3)
@@ -274,6 +273,7 @@ def run(program : ArgumentParser,arg_list) -> None:
 	          #crop_vision_frame = normalize_frame_color(crop_vision_frame)
 	          binary_face = frame_to_binary(crop_vision_frame)
 	          binary_faces[index] = binary_face
+          clear_face_analyser()
           return binary_faces
 
 
