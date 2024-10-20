@@ -9,6 +9,8 @@ import sys
 import warnings
 import shutil
 import numpy
+import torch
+import gc
 import onnxruntime
 from time import sleep, time
 from argparse import ArgumentParser, HelpFormatter
@@ -274,6 +276,8 @@ def run(program : ArgumentParser,arg_list) -> None:
 	          binary_face = frame_to_binary(crop_vision_frame)
 	          binary_faces[index] = binary_face
           clear_face_analyser()
+          torch.cuda.empty_cache()
+          gc.collect()
           return binary_faces
 
 
