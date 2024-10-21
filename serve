@@ -51,15 +51,15 @@ def start_server():
     subprocess.check_call(['ln', '-sf', '/dev/stderr', '/var/log/nginx/error.log'])
 
     nginx = subprocess.Popen(['nginx', '-c', '/opt/program/nginx.conf'])
-    #gunicorn = subprocess.Popen(['gunicorn',
-    #                             '--timeout', str(model_server_timeout),
-    #                             '-k', 'sync',
-    #                             '-b', 'unix:/tmp/gunicorn.sock',
-    #                             '-w', str(model_server_workers),
-    #                             'wsgi:app'])
+    #gunicorn = subprocess.Popen('gunicorn --timeout '+ str(model_server_timeout)+
+    #                             ' -k  sync -b unix:/tmp/gunicorn.sock -w ' +
+    #                             str(model_server_workers)+' wsgi:app',shell=True)
     gunicorn = subprocess.Popen('gunicorn --timeout '+ str(model_server_timeout)+
-                                 ' -k  sync -b unix:/tmp/gunicorn.sock -w ' +
-                                 str(model_server_workers)+' wsgi:app',shell=True)
+                            ' -k sync -b unix:/tmp/gunicorn.sock -w ' +
+                            str(model_server_workers)+
+                            ' --max-requests 10 --max-requests-jitter 5' +
+                            ' wsgi:app',
+                            shell=True)
 
     signal.signal(signal.SIGTERM, lambda a, b: sigterm_handler(nginx.pid, gunicorn.pid))
 

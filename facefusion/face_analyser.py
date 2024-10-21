@@ -120,7 +120,13 @@ def get_face_analyser() -> Any:
 def clear_face_analyser() -> Any:
 	global FACE_ANALYSER
 
-	FACE_ANALYSER = None
+	try:
+		FACE_ANALYSER['face_detectors'] = None
+		FACE_ANALYSER['face_recognizer'] = None
+		FACE_ANALYSER['face_landmarkers'] = None
+		FACE_ANALYSER['gender_age'] = None
+	finally:
+		FACE_ANALYSER = None
 
 
 def pre_check() -> bool:
