@@ -427,17 +427,61 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 
 
 def process_image(source_paths : List[str], target_path : str, output_path : str) -> None:
-	reference_faces = get_reference_faces() if 'reference' in facefusion.globals.face_selector_mode else None
-	source_frames = read_static_images(source_paths)
-	source_face = get_average_face(source_frames)
-	target_vision_frame = read_static_image(target_path)
-	output_vision_frame = process_frame(
-	{
-		'reference_faces': reference_faces,
-		'source_face': source_face,
-		'target_vision_frame': target_vision_frame
-	})
-	write_image(output_path, output_vision_frame)
+	if os.environ.get("faces_mapping"):
+		reference_faces = get_reference_faces() if 'reference' in facefusion.globals.face_selector_mode else None
+		faces_mapping_file_path = os.environ["faces_mapping"]
+		source_faces_inputs = []
+        faces_mapping_json = {}
+        # 读取文件内容
+        with open(faces_mapping_file_path, 'r') as file:
+            faces_mapping_content = file.read()
+        # 解析 JSON 内容并解码器
+        faces_mapping_json = json.loads(faces_mapping_content)
+        faces_mapping_json = decode_dict(faces_mapping_json)
+        source_frames_inputs = source_frames
+        for source_frames_input in source_frames_inputs:
+            face = get_average_face([source_frames_input])
+            source_faces_inputs.append(face)
+        for index, source_face in enumerate(source_faces_inputs):
+        	reference_face_input = create_face_by_base64(faces_mapping_json[index])
+        	#print("here3=== 开始换第",index," 张脸")
+        	reference_faces_copy = copy.deepcopy(reference_faces)
+        	for key in reference_faces_copy:
+        	    #print("here1=== ",key)
+        	    #if "swapper" in key:
+        	    #if "origin" in key:
+        	    reference_faces_originals = reference_faces_copy[key]
+        	    # 创建一个新列表来存储要保留的 faces
+        	    faces_to_keep = []
+        	    for reference_faces_original in reference_faces_originals:
+        	        ### find the similar reference face from frame
+        	        if compare_faces(reference_faces_original, reference_face_input, facefusion.globals.reference_face_distance):
+        	            print("found similar face in is_image frame")
+        	            faces_to_keep.append(reference_faces_original)
+        	        else:
+        	            # 如果 compare_faces 返回 False，不将该 face 添加到 faces_to_keep
+        	            pass
+        	    # 用新的列表替换原来的 reference_faces[key]
+        	    reference_faces_copy[key] = faces_to_keep
+        	    target_vision_frame = process_frame(
+                {
+                	'reference_faces': reference_faces_copy,
+                	'source_face': source_face,
+                	'target_vision_frame': target_vision_frame
+                })
+            write_image(output_path, target_vision_frame)
+	else:
+		reference_faces = get_reference_faces() if 'reference' in facefusion.globals.face_selector_mode else None
+		source_frames = read_static_images(source_paths)
+		source_face = get_average_face(source_frames)
+		target_vision_frame = read_static_image(target_path)
+		output_vision_frame = process_frame(
+		{
+			'reference_faces': reference_faces,
+			'source_face': source_face,
+			'target_vision_frame': target_vision_frame
+		})
+		write_image(output_path, output_vision_frame)
 
 
 def process_video(source_paths : List[str], temp_frame_paths : List[str]) -> None:

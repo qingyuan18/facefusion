@@ -255,8 +255,12 @@ def run(program : ArgumentParser,arg_list) -> None:
           apply_args(program,arg_list)
 
           ### get target video's frame ,and use yolo to dectect reference faces
-          vision_frame = get_video_frame(facefusion.globals.target_path, frame_number)
-          #print(f"here0===, type:{type(vision_frame)}, shape:{vision_frame.shape}, {vision_frame}")
+          vision_frame = None
+          if is_video(facefusion.globals.target_path):
+              vision_frame = get_video_frame(facefusion.globals.target_path, frame_number)
+              #print(f"here0===, type:{type(vision_frame)}, shape:{vision_frame.shape}, {vision_frame}")
+          else:
+              vision_frame = read_image(facefusion.globals.target_path)
           reference_faces = get_many_faces(vision_frame)
           #print("here1===",type(reference_faces))
           #print("here2===",reference_faces[0])
