@@ -197,6 +197,8 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 	facefusion.globals.keep_temp = args.keep_temp
 	# output creation
 	facefusion.globals.output_image_quality = args.output_image_quality
+	if "s3" in facefusion.globals.target_path :
+    	pre_download()
 	if is_image(args.target_path):
 		output_image_resolution = detect_image_resolution(args.target_path)
 		output_image_resolutions = create_image_resolutions(output_image_resolution)
@@ -207,8 +209,6 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 	facefusion.globals.output_video_encoder = args.output_video_encoder
 	facefusion.globals.output_video_preset = args.output_video_preset
 	facefusion.globals.output_video_quality = args.output_video_quality
-	if "s3" in facefusion.globals.target_path :
-	    pre_download()
 	if is_video(facefusion.globals.target_path):
 		output_video_resolution = detect_video_resolution(facefusion.globals.target_path)
 		output_video_resolutions = create_video_resolutions(output_video_resolution)
