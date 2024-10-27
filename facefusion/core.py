@@ -198,7 +198,7 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 	# output creation
 	facefusion.globals.output_image_quality = args.output_image_quality
 	if "s3" in facefusion.globals.target_path :
-    	pre_download()
+		pre_download()
 	if is_image(args.target_path):
 		output_image_resolution = detect_image_resolution(args.target_path)
 		output_image_resolutions = create_image_resolutions(output_image_resolution)
