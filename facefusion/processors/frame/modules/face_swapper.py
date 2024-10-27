@@ -429,6 +429,8 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 def process_image(source_paths : List[str], target_path : str, output_path : str) -> None:
 	if os.environ.get("faces_mapping"):
 		reference_faces = get_reference_faces() if 'reference' in facefusion.globals.face_selector_mode else None
+		source_frames = read_static_images(source_paths)
+		target_vision_frame = read_static_image(target_path)
 		faces_mapping_file_path = os.environ["faces_mapping"]
 		source_faces_inputs = []
 		faces_mapping_json = {}

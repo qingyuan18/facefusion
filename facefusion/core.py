@@ -485,6 +485,7 @@ def process_image(start_time : float) -> None:
 	else:
 		logger.warn(wording.get('finalizing_image_skipped'), __name__.upper())
 	# clear temp
+	write_to_s3(normed_output_path,facefusion.globals.s3_output_path)
 	logger.debug(wording.get('clearing_temp'), __name__.upper())
 	clear_temp(facefusion.globals.target_path)
 	# validate image
