@@ -200,7 +200,7 @@ def apply_args(program : ArgumentParser,arg_list) -> None:
 	if "s3" in facefusion.globals.target_path :
 		pre_download()
 	if is_image(facefusion.globals.target_path):
-		output_image_resolution = detect_image_resolution(args.target_path)
+		output_image_resolution = detect_image_resolution(facefusion.globals.target_path)
 		output_image_resolutions = create_image_resolutions(output_image_resolution)
 		if args.output_image_resolution in output_image_resolutions:
 			facefusion.globals.output_image_resolution = args.output_image_resolution
