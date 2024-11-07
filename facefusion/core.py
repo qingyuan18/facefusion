@@ -338,8 +338,7 @@ def write_to_s3(output_local_url, output_s3_url):
     s3_client.put_object(
         Body=buf.getvalue(),
         Bucket=bucket,
-        Key=key,
-        ContentType='video/mp4')
+        Key=key)
 
 def download_from_s3(source_s3_url,local_file_path):
     s3 = boto3.client('s3')
