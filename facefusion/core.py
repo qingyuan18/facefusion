@@ -326,10 +326,17 @@ def pre_check() -> bool:
 		return False
 	return True
 
-def write_to_s3(output_local_url, output_s3_url):
+def write_to_s3(output_local_url, output_s3_url,mediaType):
     video_local_file = output_local_url
     bucket, key = get_bucket_and_key(output_s3_url)
     buf = io.BytesIO()
+	# 设置Content-Type
+    if mediaType.lower() == "image":
+        content_type = 'image/jpeg'  # 可以根据需要修改为其他图片格式，如 'image/png'
+    elif mediaType.lower() == "video":
+        content_type = 'video/mp4'
+    else:
+        content_type = 'application/octet-stream'  # 默认二进制流
     # 将视频文件读取到BytesIO对象
     with open(video_local_file, 'rb') as f:
         buf.write(f.read())
@@ -338,7 +345,8 @@ def write_to_s3(output_local_url, output_s3_url):
     s3_client.put_object(
         Body=buf.getvalue(),
         Bucket=bucket,
-        Key=key)
+        Key=key,
+		ContentType=content_type)
 
 def download_from_s3(source_s3_url,local_file_path):
     s3 = boto3.client('s3')
@@ -484,7 +492,7 @@ def process_image(start_time : float) -> None:
 	else:
 		logger.warn(wording.get('finalizing_image_skipped'), __name__.upper())
 	# clear temp
-	write_to_s3(normed_output_path,facefusion.globals.s3_output_path)
+	write_to_s3(normed_output_path,facefusion.globals.s3_output_path,"image")
 	logger.debug(wording.get('clearing_temp'), __name__.upper())
 	clear_temp(facefusion.globals.target_path)
 	# validate image
@@ -564,7 +572,7 @@ def process_video(start_time : float) -> None:
 				logger.warn(wording.get('restoring_audio_skipped'), __name__.upper())
 				move_temp(facefusion.globals.target_path, normed_output_path)
 	#print("here1==",normed_output_path)
-	write_to_s3(normed_output_path,facefusion.globals.s3_output_path)
+	write_to_s3(normed_output_path,facefusion.globals.s3_output_path,"video")
 	# clear temp
 	logger.info(wording.get('clearing_temp'), __name__.upper())
 	clear_temp(facefusion.globals.target_path)
