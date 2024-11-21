@@ -326,27 +326,78 @@ def pre_check() -> bool:
 		return False
 	return True
 
-def write_to_s3(output_local_url, output_s3_url,mediaType):
+def write_to_s3(output_local_url, output_s3_url, mediaType):
     video_local_file = output_local_url
     bucket, key = get_bucket_and_key(output_s3_url)
     buf = io.BytesIO()
-	# 设置Content-Type
+
+    # 获取文件扩展名
+    file_extension = key.lower().split('.')[-1] if '.' in key else ''
+
+    # 设置Content-Type
     if mediaType.lower() == "image":
-        content_type = 'image/jpeg'  # 可以根据需要修改为其他图片格式，如 'image/png'
+        # 根据图片扩展名设置具体的content type
+        content_type_mapping = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'webp': 'image/webp',
+            'tiff': 'image/tiff',
+            'svg': 'image/svg+xml'
+        }
+        content_type = content_type_mapping.get(file_extension, 'image/jpeg')
     elif mediaType.lower() == "video":
-        content_type = 'video/mp4'
+        # 根据视频扩展名设置具体的content type
+        content_type_mapping = {
+            'mp4': 'video/mp4',
+            'avi': 'video/x-msvideo',
+            'mov': 'video/quicktime',
+            'wmv': 'video/x-ms-wmv',
+            'flv': 'video/x-flv',
+            'webm': 'video/webm',
+            'mkv': 'video/x-matroska'
+        }
+        content_type = content_type_mapping.get(file_extension, 'video/mp4')
     else:
         content_type = 'application/octet-stream'  # 默认二进制流
-    # 将视频文件读取到BytesIO对象
+
+    # 将文件读取到BytesIO对象
     with open(video_local_file, 'rb') as f:
         buf.write(f.read())
+
     # 将BytesIO对象的内容上传到S3
     s3_client = boto3.client('s3')
     s3_client.put_object(
         Body=buf.getvalue(),
         Bucket=bucket,
         Key=key,
-		ContentType=content_type)
+        ContentType=content_type
+    )
+
+
+#def write_to_s3(output_local_url, output_s3_url,mediaType):
+#    video_local_file = output_local_url
+#    bucket, key = get_bucket_and_key(output_s3_url)
+#    buf = io.BytesIO()
+#	# 设置Content-Type
+#    if mediaType.lower() == "image":
+#        content_type = 'image/jpeg'  # 可以根据需要修改为其他图片格式，如 'image/png'
+#    elif mediaType.lower() == "video":
+#        content_type = 'video/mp4'
+#    else:
+#        content_type = 'application/octet-stream'  # 默认二进制流
+#    # 将视频文件读取到BytesIO对象
+#    with open(video_local_file, 'rb') as f:
+#        buf.write(f.read())
+#    # 将BytesIO对象的内容上传到S3
+#    s3_client = boto3.client('s3')
+#    s3_client.put_object(
+#        Body=buf.getvalue(),
+#        Bucket=bucket,
+#        Key=key,
+#		ContentType=content_type)
 
 def download_from_s3(source_s3_url,local_file_path):
     s3 = boto3.client('s3')
