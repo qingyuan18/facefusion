@@ -542,6 +542,8 @@ def get_many_faces(vision_frame : VisionFrame) -> List[Face]:
 			bounding_box_list = []
 			face_landmark_5_list = []
 			score_list = []
+			print("face_detector_model",facefusion.globals.face_detector_model)
+			print("face_detector_score",facefusion.globals.face_detector_score)
 
 			if facefusion.globals.face_detector_model in [ 'many', 'retinaface']:
 				bounding_box_list_retinaface, face_landmark_5_list_retinaface, score_list_retinaface = detect_with_retinaface(vision_frame, facefusion.globals.face_detector_size)
