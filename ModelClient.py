@@ -44,7 +44,7 @@ class ModelClient:
             Body=payload,
         )
         result = response['Body'].read().decode()
-        print('返回：',result)
+        return result
 
 
     def analyze_video(self, user_id, source_video_s3_path, frame_number):
@@ -60,7 +60,7 @@ class ModelClient:
         	        "input":inputs,
                     }
         response = self.invoke_endpoint(request,content_type="application/json")
-        return response['Body'].read().decode("UTF-8")
+        return response
 
 
 
@@ -74,9 +74,13 @@ class ModelClient:
         # 触发调用 SageMaker endpoint
         inputs = ['-t',source_video_s3_path,
                   '--execution-providers','cuda',
-                  '-o','/opt/program/output/'+output_video_name,'-u',output_video_s3_path,'--headless']
+                  '-o','/opt/program/output/'+output_video_name,'-u',output_video_s3_path,
+                  '--face-detector-score',"0.75",
+                  '--face-landmarker-score',"0.75",
+                  '--headless']
         for swap_face_image_s3_path in swap_face_image_s3_paths:
-            inputs.append(['-s',swap_face_image_s3_path])
+            inputs.append('-s')
+            inputs.append(swap_face_image_s3_path)
 
         if faces_mapping_dict:
             s3_client = boto3.client('s3')
@@ -88,8 +92,8 @@ class ModelClient:
             s3_bucket, key = self.get_bucket_and_key(faces_mapping_s3_key)
             s3_client.upload_file(temp_file_path, s3_bucket, key)
             # 参数传 face mapping的s3路径
-            inputs.append(['--many',faces_mapping_s3_key)
-            inputs.append(['--face-selector-mode','reference'])
+            inputs.extend(['--many',faces_mapping_s3_key])
+            inputs.extend(['--face-selector-mode','reference'])
         request = {
         	        "method":"submit",
         	        "input":inputs,
