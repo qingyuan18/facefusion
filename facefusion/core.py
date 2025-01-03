@@ -439,8 +439,8 @@ def pre_download()-> None:
         if "s3" in faces_mapping_s3_path:
             file_name = os.path.basename(faces_mapping_s3_path)
             download_file = "/tmp/" + file_name
-			if not os.path.exists(download_file):
-				download_from_s3(faces_mapping_s3_path, download_file)
+            if not os.path.exists(download_file):
+                download_from_s3(faces_mapping_s3_path, download_file)
             # 更新环境变量中的 faces_mapping为本地路径文件
             #print("here1==",download_file)
             os.environ["faces_mapping"] = download_file
