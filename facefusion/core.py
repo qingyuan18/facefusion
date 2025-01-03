@@ -291,14 +291,18 @@ def run(program : ArgumentParser,arg_list) -> None:
       if facefusion.globals.system_memory_limit > 0:
       	  limit_system_memory(facefusion.globals.system_memory_limit)
       if facefusion.globals.force_download:
-      	  force_download()
+      	  print("here1=====")
+		  force_download()
       	  return
       if not pre_check() or not content_analyser.pre_check() or not face_analyser.pre_check() or not face_masker.pre_check() or not voice_extractor.pre_check():
-      	  return
+      	  print("here2=====")
+		  return
       for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
       	  if not frame_processor_module.pre_check():
-      	  	return
+			 print("here3=====")
+             return
       if facefusion.globals.headless:
+          print("here5=====")
       	  conditional_process()
       else:
       	  import facefusion.uis.core as ui

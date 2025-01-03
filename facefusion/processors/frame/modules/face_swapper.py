@@ -36,7 +36,7 @@ MODELS : ModelSet =\
 	'blendswap_256':
 	{
 		'type': 'blendswap',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/blendswap_256.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/blendswap_256.onnx',
 		'path': resolve_relative_path('../.assets/models/blendswap_256.onnx'),
 		'template': 'ffhq_512',
 		'size': (256, 256),
@@ -46,7 +46,7 @@ MODELS : ModelSet =\
 	'inswapper_128':
 	{
 		'type': 'inswapper',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/inswapper_128.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/inswapper_128.onnx',
 		'path': resolve_relative_path('../.assets/models/inswapper_128.onnx'),
 		'template': 'arcface_128_v2',
 		'size': (128, 128),
@@ -56,7 +56,7 @@ MODELS : ModelSet =\
 	'inswapper_128_fp16':
 	{
 		'type': 'inswapper',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/inswapper_128_fp16.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/inswapper_128_fp16.onnx',
 		'path': resolve_relative_path('../.assets/models/inswapper_128_fp16.onnx'),
 		'template': 'arcface_128_v2',
 		'size': (128, 128),
@@ -66,7 +66,7 @@ MODELS : ModelSet =\
 	'simswap_256':
 	{
 		'type': 'simswap',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/simswap_256.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/simswap_256.onnx',
 		'path': resolve_relative_path('../.assets/models/simswap_256.onnx'),
 		'template': 'arcface_112_v1',
 		'size': (256, 256),
@@ -76,7 +76,7 @@ MODELS : ModelSet =\
 	'simswap_512_unofficial':
 	{
 		'type': 'simswap',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/simswap_512_unofficial.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/simswap_512_unofficial.onnx',
 		'path': resolve_relative_path('../.assets/models/simswap_512_unofficial.onnx'),
 		'template': 'arcface_112_v1',
 		'size': (512, 512),
@@ -86,7 +86,7 @@ MODELS : ModelSet =\
 	'uniface_256':
 	{
 		'type': 'uniface',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/uniface_256.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/uniface_256.onnx',
 		'path': resolve_relative_path('../.assets/models/uniface_256.onnx'),
 		'template': 'ffhq_512',
 		'size': (256, 256),
