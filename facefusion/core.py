@@ -419,7 +419,7 @@ def pre_download()-> None:
             if path.startswith("s3://"):
                 file_name = os.path.basename(path)
                 download_file = os.path.join("/tmp", file_name)
-				if not os.path.exists(download_file):
+                if not os.path.exists(download_file):
                     download_from_s3(path, download_file)
                 updated_paths.append(download_file)
             else:
@@ -428,8 +428,8 @@ def pre_download()-> None:
     if "s3" in  facefusion.globals.target_path:
         file_name = os.path.basename(facefusion.globals.target_path)
         download_file = "/tmp/"+file_name
-		if not os.path.exists(download_file):
-			download_from_s3(facefusion.globals.target_path,"/tmp/"+file_name)
+        if not os.path.exists(download_file):
+            download_from_s3(facefusion.globals.target_path,"/tmp/"+file_name)
         facefusion.globals.target_path = "/tmp/"+file_name
     if os.environ.get("faces_mapping"):
         # 从 JSON 字符串解析,并还原为bytes二进制的reference image值
