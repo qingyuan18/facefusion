@@ -17,7 +17,7 @@ MODELS : ModelSet =\
 {
 	'voice_extractor':
 	{
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/voice_extractor.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/voice_extractor.onnx',
 		'path': resolve_relative_path('../.assets/models/voice_extractor.onnx')
 	}
 }

@@ -15,8 +15,8 @@ def before_all() -> None:
 	facefusion.globals.temp_frame_format = 'png'
 	conditional_download('.assets/examples',
 	[
-		'https://github.com/facefusion/facefusion-assets/releases/download/examples/source.jpg',
-		'https://github.com/facefusion/facefusion-assets/releases/download/examples/target-240p.mp4'
+		'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/source.jpg',
+		'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/target-240p.mp4'
 	])
 	subprocess.run([ 'ffmpeg', '-i', '.assets/examples/target-240p.mp4', '-vf', 'fps=25', '.assets/examples/target-240p-25fps.mp4' ])
 	subprocess.run([ 'ffmpeg', '-i', '.assets/examples/target-240p.mp4', '-vf', 'fps=30', '.assets/examples/target-240p-30fps.mp4' ])
@@ -150,14 +150,14 @@ def test_is_video() -> None:
 
 
 def test_get_download_size() -> None:
-	assert get_download_size('https://github.com/facefusion/facefusion-assets/releases/download/examples/target-240p.mp4') == 191675
-	assert get_download_size('https://github.com/facefusion/facefusion-assets/releases/download/examples/target-360p.mp4') == 370732
+	assert get_download_size('https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/target-240p.mp4') == 191675
+	assert get_download_size('https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/target-360p.mp4') == 370732
 	assert get_download_size('invalid') == 0
 
 
 def test_is_download_done() -> None:
-	assert is_download_done('https://github.com/facefusion/facefusion-assets/releases/download/examples/target-240p.mp4', '.assets/examples/target-240p.mp4') is True
-	assert is_download_done('https://github.com/facefusion/facefusion-assets/releases/download/examples/target-240p.mp4','invalid') is False
+	assert is_download_done('https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/target-240p.mp4', '.assets/examples/target-240p.mp4') is True
+	assert is_download_done('https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/target-240p.mp4','invalid') is False
 	assert is_download_done('invalid', 'invalid') is False
 
 

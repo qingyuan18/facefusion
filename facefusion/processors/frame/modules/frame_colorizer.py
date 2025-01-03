@@ -29,31 +29,31 @@ MODELS : ModelSet =\
 	'ddcolor':
 	{
 		'type': 'ddcolor',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/ddcolor.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/ddcolor.onnx',
 		'path': resolve_relative_path('../.assets/models/ddcolor.onnx')
 	},
 	'ddcolor_artistic':
 	{
 		'type': 'ddcolor',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/ddcolor_artistic.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/ddcolor_artistic.onnx',
 		'path': resolve_relative_path('../.assets/models/ddcolor_artistic.onnx')
 	},
 	'deoldify':
 	{
 		'type': 'deoldify',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/deoldify.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/deoldify.onnx',
 		'path': resolve_relative_path('../.assets/models/deoldify.onnx')
 	},
 	'deoldify_artistic':
 	{
 		'type': 'deoldify',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/deoldify_artistic.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/deoldify_artistic.onnx',
 		'path': resolve_relative_path('../.assets/models/deoldify_artistic.onnx')
 	},
 	'deoldify_stable':
 	{
 		'type': 'deoldify',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/deoldify_stable.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/deoldify_stable.onnx',
 		'path': resolve_relative_path('../.assets/models/deoldify_stable.onnx')
 	}
 }

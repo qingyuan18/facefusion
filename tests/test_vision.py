@@ -14,8 +14,8 @@ def before_all() -> None:
 	facefusion.globals.temp_frame_format = 'png'
 	conditional_download('.assets/examples',
 	[
-		'https://github.com/facefusion/facefusion-assets/releases/download/examples/source.jpg',
-		'https://github.com/facefusion/facefusion-assets/releases/download/examples/target-240p.mp4'
+		'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/source.jpg',
+		'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/target-240p.mp4'
 	])
 	subprocess.run([ 'ffmpeg', '-i', '.assets/examples/target-240p.mp4', '-vf', 'fps=25', '.assets/examples/target-240p-25fps.mp4' ])
 	subprocess.run([ 'ffmpeg', '-i', '.assets/examples/target-240p.mp4', '-vf', 'fps=30', '.assets/examples/target-240p-30fps.mp4' ])

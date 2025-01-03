@@ -10,8 +10,8 @@ from facefusion.utilities import conditional_download
 def before_all() -> None:
 	conditional_download('.assets/examples',
 	[
-		'https://github.com/facefusion/facefusion-assets/releases/download/examples/source.jpg',
-		'https://github.com/facefusion/facefusion-assets/releases/download/examples/target-1080p.mp4'
+		'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/source.jpg',
+		'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/examples/target-1080p.mp4'
 	])
 	subprocess.run([ 'ffmpeg', '-i', '.assets/examples/target-1080p.mp4', '-vframes', '1', '.assets/examples/target-1080p.jpg' ])
 

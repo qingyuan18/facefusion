@@ -29,7 +29,7 @@ MODELS : Dict[str, ModelValue] =\
 	'blendswap_256':
 	{
 		'type': 'blendswap',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/blendswap_256.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/blendswap_256.onnx',
 		'path': resolve_relative_path('../.assets/models/blendswap_256.onnx'),
 		'template': 'ffhq',
 		'size': (512, 256),
@@ -39,7 +39,7 @@ MODELS : Dict[str, ModelValue] =\
 	'inswapper_128':
 	{
 		'type': 'inswapper',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/inswapper_128.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/inswapper_128.onnx',
 		'path': resolve_relative_path('../.assets/models/inswapper_128.onnx'),
 		'template': 'arcface_v2',
 		'size': (128, 128),
@@ -49,7 +49,7 @@ MODELS : Dict[str, ModelValue] =\
 	'inswapper_128_fp16':
 	{
 		'type': 'inswapper',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/inswapper_128_fp16.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/inswapper_128_fp16.onnx',
 		'path': resolve_relative_path('../.assets/models/inswapper_128_fp16.onnx'),
 		'template': 'arcface_v2',
 		'size': (128, 128),
@@ -59,7 +59,7 @@ MODELS : Dict[str, ModelValue] =\
 	'simswap_256':
 	{
 		'type': 'simswap',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/simswap_256.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/simswap_256.onnx',
 		'path': resolve_relative_path('../.assets/models/simswap_256.onnx'),
 		'template': 'arcface_v1',
 		'size': (112, 256),
@@ -69,7 +69,7 @@ MODELS : Dict[str, ModelValue] =\
 	'simswap_512_unofficial':
 	{
 		'type': 'simswap',
-		'url': 'https://github.com/facefusion/facefusion-assets/releases/download/models/simswap_512_unofficial.onnx',
+		'url': 'https://huggingface.co/crj/dl-ws/resolve/main/releases/download/models/simswap_512_unofficial.onnx',
 		'path': resolve_relative_path('../.assets/models/simswap_512_unofficial.onnx'),
 		'template': 'arcface_v1',
 		'size': (112, 512),
