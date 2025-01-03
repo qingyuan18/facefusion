@@ -236,7 +236,6 @@ def frame_to_binary(frame: VisionFrame) -> bytes:
     return cv2.imencode('.png', frame)[1].tobytes()
 
 
-
 def run(program : ArgumentParser,arg_list) -> None:
       ## if just analyze video frame, return the reference face image binary directly
       if "--analyze_index" in arg_list:
@@ -289,27 +288,27 @@ def run(program : ArgumentParser,arg_list) -> None:
       apply_args(program,arg_list)
       logger.init(facefusion.globals.log_level)
       if facefusion.globals.system_memory_limit > 0:
-      	  limit_system_memory(facefusion.globals.system_memory_limit)
+          limit_system_memory(facefusion.globals.system_memory_limit)
       if facefusion.globals.force_download:
-      	  print("here1=====")
-		  force_download()
-      	  return
+          #print("here1=====")
+          force_download()
+          return
       if not pre_check() or not content_analyser.pre_check() or not face_analyser.pre_check() or not face_masker.pre_check() or not voice_extractor.pre_check():
-      	  print("here2=====")
-		  return
+          #print("here2=====")
+          return
       for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
-      	  if not frame_processor_module.pre_check():
-			 print("here3=====")
+          if not frame_processor_module.pre_check():
+             print("here3=====")
              return
       if facefusion.globals.headless:
           print("here5=====")
-      	  conditional_process()
+          conditional_process()
       else:
-      	  import facefusion.uis.core as ui
-      	  for ui_layout in ui.get_ui_layouts_modules(facefusion.globals.ui_layouts):
-      	  	if not ui_layout.pre_check():
-      	  		return
-      	  ui.launch()
+          import facefusion.uis.core as ui
+          for ui_layout in ui.get_ui_layouts_modules(facefusion.globals.ui_layouts):
+            if not ui_layout.pre_check():
+                return
+          ui.launch()
 
 
 def destroy() -> None:
