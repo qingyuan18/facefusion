@@ -293,7 +293,7 @@ def run(program : ArgumentParser,arg_list) -> None:
           #print("here1=====")
           force_download()
           return
-      if not pre_check() or not content_analyser.pre_check() or not face_analyser.pre_check() or not face_masker.pre_check() or not voice_extractor.pre_check():
+      if not pre_check() or not face_analyser.pre_check() or not face_masker.pre_check() or not voice_extractor.pre_check():
           #print("here2=====")
           return
       for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
@@ -517,8 +517,8 @@ def force_download_specific_module(module) -> None:
 
 def process_image(start_time : float) -> None:
 	normed_output_path = normalize_output_path(facefusion.globals.target_path, facefusion.globals.output_path)
-	if analyse_image(facefusion.globals.target_path):
-		return
+	#if analyse_image(facefusion.globals.target_path):
+	#	return
 	# clear temp
 	logger.debug(wording.get('clearing_temp'), __name__.upper())
 	clear_temp(facefusion.globals.target_path)
@@ -564,8 +564,8 @@ def process_image(start_time : float) -> None:
 
 def process_video(start_time : float) -> None:
 	normed_output_path = normalize_output_path(facefusion.globals.target_path, facefusion.globals.output_path)
-	if analyse_video(facefusion.globals.target_path, facefusion.globals.trim_frame_start, facefusion.globals.trim_frame_end):
-		return
+	#if analyse_video(facefusion.globals.target_path, facefusion.globals.trim_frame_start, facefusion.globals.trim_frame_end):
+	#	return
 	# clear temp
 	logger.debug(wording.get('clearing_temp'), __name__.upper())
 	clear_temp(facefusion.globals.target_path)
