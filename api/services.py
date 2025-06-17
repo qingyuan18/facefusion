@@ -1,0 +1,466 @@
+"""
+Service layer for FaceFusion API operations.
+"""
+import json
+import os
+import sys
+import subprocess
+import uuid
+import json
+import tempfile
+import base64
+import gc
+from typing import Dict, List, Optional, Tuple
+from pathlib import Path
+
+# Add the project root to Python path so we can import facefusion modules
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+from api.models import HeadlessRunRequest, HeadlessRunResponse, JobStatusResponse, AnalyzeRequest, AnalyzeResponse
+
+
+class FaceFusionService:
+    """Service class for FaceFusion operations."""
+    
+    def __init__(self):
+        self.jobs_storage = {}  # In-memory job storage (in production, use Redis or database)
+        self.facefusion_script = "facefusion.py"
+        
+    def get_available_processors(self) -> List[str]:
+        """Get list of available processors."""
+        try:
+            # Get processors from the processors/modules directory
+            processors_dir = Path("facefusion/processors/modules")
+            if processors_dir.exists():
+                processors = []
+                for file_path in processors_dir.glob("*.py"):
+                    if file_path.name != "__init__.py":
+                        processors.append(file_path.stem)
+                return sorted(processors)
+            return ["face_swapper", "face_enhancer", "face_debugger"]  # fallback
+        except Exception:
+            return ["face_swapper", "face_enhancer", "face_debugger"]  # fallback
+    
+    def download_s3_paths_if_needed(self, request: HeadlessRunRequest) -> Tuple[bool, str, HeadlessRunRequest]:
+        """Download S3 paths to local /tmp/ directory if needed."""
+        try:
+            # Import S3 download functions
+            sys.path.insert(0, project_root)
+            from facefusion.download import download_file_if_needed, is_s3_path
+
+            # Create a copy of the request to modify paths
+            updated_request = request.model_copy()
+
+            # Download source paths if they are S3 URLs
+            updated_source_paths = []
+            for source_path in request.source_paths:
+                if is_s3_path(source_path):
+                    local_path = download_file_if_needed(source_path)
+                    updated_source_paths.append(local_path)
+                else:
+                    updated_source_paths.append(source_path)
+            updated_request.source_paths = updated_source_paths
+
+            # Download target path if it's an S3 URL
+            if is_s3_path(request.target_path):
+                updated_request.target_path = download_file_if_needed(request.target_path)
+
+            return True, "S3 paths downloaded successfully", updated_request
+
+        except Exception as e:
+            return False, f"Failed to download S3 paths: {str(e)}", request
+
+    def validate_paths(self, request: HeadlessRunRequest) -> Tuple[bool, str]:
+        """Validate input paths."""
+        # Check source paths
+        for source_path in request.source_paths:
+            if not os.path.exists(source_path):
+                return False, f"Source path does not exist: {source_path}"
+
+        # Check target path
+        if not os.path.exists(request.target_path):
+            return False, f"Target path does not exist: {request.target_path}"
+
+        # Check output directory exists
+        output_dir = os.path.dirname(request.output_path)
+        if output_dir and not os.path.exists(output_dir):
+            try:
+                os.makedirs(output_dir, exist_ok=True)
+            except Exception as e:
+                return False, f"Cannot create output directory: {e}"
+
+        return True, "Paths validated successfully"
+    
+    def build_command(self, request: HeadlessRunRequest) -> List[str]:
+        """Build the facefusion command from request parameters."""
+        cmd = [sys.executable, self.facefusion_script, "headless-run"]
+        
+        # Add source paths
+        cmd.extend(["-s"] + request.source_paths)
+        
+        # Add target and output paths
+        cmd.extend(["-t", request.target_path])
+        cmd.extend(["-o", request.output_path])
+        
+        # Add optional configuration
+        if request.config_path and request.config_path != "facefusion.ini":
+            cmd.extend(["--config-path", request.config_path])
+        
+        if request.temp_path:
+            cmd.extend(["--temp-path", request.temp_path])
+        
+        if request.jobs_path:
+            cmd.extend(["--jobs-path", request.jobs_path])
+        
+        # Face detector settings
+        if request.face_detector_model:
+            cmd.extend(["--face-detector-model", request.face_detector_model])
+        
+        if request.face_detector_size:
+            cmd.extend(["--face-detector-size", request.face_detector_size])
+        
+        if request.face_detector_angles:
+            cmd.extend(["--face-detector-angles"] + [str(angle) for angle in request.face_detector_angles])
+        
+        if request.face_detector_score is not None:
+            cmd.extend(["--face-detector-score", str(request.face_detector_score)])
+        
+        # Face landmarker settings
+        if request.face_landmarker_model:
+            cmd.extend(["--face-landmarker-model", request.face_landmarker_model])
+        
+        # Face selector settings
+        if request.face_selector_mode:
+            cmd.extend(["--face-selector-mode", request.face_selector_mode])
+        
+        if request.face_selector_order:
+            cmd.extend(["--face-selector-order", request.face_selector_order])
+        
+        if request.reference_face_distance is not None:
+            cmd.extend(["--reference-face-distance", str(request.reference_face_distance)])
+        
+        if request.reference_frame_number is not None:
+            cmd.extend(["--reference-frame-number", str(request.reference_frame_number)])
+        
+        # Face masker settings
+        if request.face_occluder_model:
+            cmd.extend(["--face-occluder-model", request.face_occluder_model])
+        
+        if request.face_parser_model:
+            cmd.extend(["--face-parser-model", request.face_parser_model])
+        
+        if request.face_mask_types:
+            cmd.extend(["--face-mask-types"] + request.face_mask_types)
+        
+        if request.face_mask_blur is not None:
+            cmd.extend(["--face-mask-blur", str(request.face_mask_blur)])
+        
+        if request.face_mask_padding:
+            cmd.extend(["--face-mask-padding"] + [str(p) for p in request.face_mask_padding])
+        
+        if request.face_mask_regions:
+            cmd.extend(["--face-mask-regions"] + request.face_mask_regions)
+        
+        # Frame extraction settings
+        if request.trim_frame_start is not None:
+            cmd.extend(["--trim-frame-start", str(request.trim_frame_start)])
+        
+        if request.trim_frame_end is not None:
+            cmd.extend(["--trim-frame-end", str(request.trim_frame_end)])
+        
+        if request.temp_frame_format:
+            cmd.extend(["--temp-frame-format", request.temp_frame_format])
+        
+        if request.keep_temp:
+            cmd.append("--keep-temp")
+        
+        # Output settings
+        if request.output_image_quality is not None:
+            cmd.extend(["--output-image-quality", str(request.output_image_quality)])
+        
+        if request.output_image_resolution:
+            cmd.extend(["--output-image-resolution", request.output_image_resolution])
+        
+        if request.output_video_encoder:
+            cmd.extend(["--output-video-encoder", request.output_video_encoder])
+        
+        if request.output_video_preset:
+            cmd.extend(["--output-video-preset", request.output_video_preset])
+        
+        if request.output_video_quality is not None:
+            cmd.extend(["--output-video-quality", str(request.output_video_quality)])
+        
+        if request.output_video_resolution:
+            cmd.extend(["--output-video-resolution", request.output_video_resolution])
+        
+        if request.output_video_fps is not None:
+            cmd.extend(["--output-video-fps", str(request.output_video_fps)])
+        
+        # Processors
+        if request.processors:
+            cmd.extend(["--processors"] + request.processors)
+
+        # Many faces mapping
+        if request.faces_mapping:
+            faces_mapping_json = json.dumps(request.faces_mapping)
+            cmd.extend(["--many", faces_mapping_json])
+        
+        # Execution settings
+        if request.execution_device_id:
+            cmd.extend(["--execution-device-id", request.execution_device_id])
+        
+        if request.execution_providers:
+            cmd.extend(["--execution-providers"] + request.execution_providers)
+        
+        if request.execution_thread_count is not None:
+            cmd.extend(["--execution-thread-count", str(request.execution_thread_count)])
+        
+        if request.execution_queue_count is not None:
+            cmd.extend(["--execution-queue-count", str(request.execution_queue_count)])
+        
+        # Memory settings
+        if request.video_memory_strategy:
+            cmd.extend(["--video-memory-strategy", request.video_memory_strategy])
+        
+        if request.system_memory_limit is not None:
+            cmd.extend(["--system-memory-limit", str(request.system_memory_limit)])
+        
+        # Logging
+        if request.log_level:
+            cmd.extend(["--log-level", request.log_level])
+        
+        return cmd
+    
+    def execute_headless_run(self, request: HeadlessRunRequest) -> HeadlessRunResponse:
+        """Execute headless-run command."""
+        # Generate job ID
+        job_id = str(uuid.uuid4())
+
+        # Download S3 paths if needed
+        s3_success, s3_message, updated_request = self.download_s3_paths_if_needed(request)
+        if not s3_success:
+            return HeadlessRunResponse(
+                success=False,
+                job_id=job_id,
+                message=s3_message,
+                error_code=1
+            )
+
+        # Use the updated request with local paths
+        request = updated_request
+
+        # Validate paths
+        valid, message = self.validate_paths(request)
+        if not valid:
+            return HeadlessRunResponse(
+                success=False,
+                job_id=job_id,
+                message=message,
+                error_code=1
+            )
+        
+        # Build command
+        cmd = self.build_command(request)
+        
+        # Store job info
+        self.jobs_storage[job_id] = {
+            "status": "running",
+            "command": cmd,
+            "output_path": request.output_path,
+            "message": "Processing started"
+        }
+        
+        try:
+            # Execute command
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=3600  # 1 hour timeout
+            )
+            
+            if result.returncode == 0:
+                # Success
+                self.jobs_storage[job_id].update({
+                    "status": "completed",
+                    "message": "Processing completed successfully"
+                })
+                
+                return HeadlessRunResponse(
+                    success=True,
+                    job_id=job_id,
+                    message="Processing completed successfully",
+                    output_path=request.output_path
+                )
+            else:
+                # Error
+                error_message = result.stderr or result.stdout or "Unknown error occurred"
+                self.jobs_storage[job_id].update({
+                    "status": "failed",
+                    "message": f"Processing failed: {error_message}"
+                })
+                
+                return HeadlessRunResponse(
+                    success=False,
+                    job_id=job_id,
+                    message=f"Processing failed: {error_message}",
+                    error_code=result.returncode
+                )
+                
+        except subprocess.TimeoutExpired:
+            self.jobs_storage[job_id].update({
+                "status": "failed",
+                "message": "Processing timed out"
+            })
+            
+            return HeadlessRunResponse(
+                success=False,
+                job_id=job_id,
+                message="Processing timed out",
+                error_code=124
+            )
+            
+        except Exception as e:
+            self.jobs_storage[job_id].update({
+                "status": "failed",
+                "message": f"Unexpected error: {str(e)}"
+            })
+            
+            return HeadlessRunResponse(
+                success=False,
+                job_id=job_id,
+                message=f"Unexpected error: {str(e)}",
+                error_code=1
+            )
+    
+    def get_job_status(self, job_id: str) -> Optional[JobStatusResponse]:
+        """Get job status by ID."""
+        if job_id not in self.jobs_storage:
+            return None
+
+        job_info = self.jobs_storage[job_id]
+        return JobStatusResponse(
+            job_id=job_id,
+            status=job_info["status"],
+            message=job_info.get("message"),
+            output_path=job_info.get("output_path") if job_info["status"] == "completed" else None
+        )
+
+    def frame_to_binary(self, frame) -> bytes:
+        """Convert vision frame to binary data."""
+        import cv2
+        import numpy
+
+        # Ensure frame is uint8 format
+        if frame.dtype != numpy.uint8:
+            frame = (frame * 255).astype(numpy.uint8)
+
+        # Encode frame as PNG
+        return cv2.imencode('.png', frame)[1].tobytes()
+
+    def execute_analyze(self, request: AnalyzeRequest) -> AnalyzeResponse:
+        """Execute face analysis on target image/video."""
+        try:
+            # Import FaceFusion modules
+            import facefusion.globals
+            from facefusion.filesystem import is_video
+            from facefusion.vision import read_image, read_video_frame
+            from facefusion.face_analyser import get_many_faces
+            from facefusion.face_detector import clear_inference_pool as clear_face_analyser
+            from facefusion.download import download_file_if_needed, is_s3_path
+            import torch
+
+            # Download S3 file if needed
+            target_path = request.target_path
+            if is_s3_path(target_path):
+                try:
+                    target_path = download_file_if_needed(target_path)
+                except Exception as e:
+                    return AnalyzeResponse(
+                        success=False,
+                        message=f"Failed to download S3 file: {str(e)}",
+                        error_code=1
+                    )
+
+            # Check if target path exists
+            if not os.path.exists(target_path):
+                return AnalyzeResponse(
+                    success=False,
+                    message=f"Target path does not exist: {target_path}",
+                    error_code=1
+                )
+
+            # Get vision frame
+            vision_frame = None
+            if is_video(target_path):
+                vision_frame = read_video_frame(target_path, request.frame_number)
+                if vision_frame is None:
+                    return AnalyzeResponse(
+                        success=False,
+                        message=f"Failed to read frame {request.frame_number} from video",
+                        error_code=2
+                    )
+            else:
+                vision_frame = read_image(target_path)
+                if vision_frame is None:
+                    return AnalyzeResponse(
+                        success=False,
+                        message="Failed to read image",
+                        error_code=2
+                    )
+
+            # Get reference faces using YOLO detection
+            reference_faces = get_many_faces([vision_frame])
+
+            if not reference_faces:
+                return AnalyzeResponse(
+                    success=True,
+                    message="No faces detected in the image/frame",
+                    encoded_faces={}
+                )
+
+            # Crop and encode faces
+            binary_faces = {}
+            for index, face in enumerate(reference_faces):
+                start_x, start_y, end_x, end_y = map(int, face.bounding_box)
+
+                # Add padding (25% of face size)
+                padding_x = int((end_x - start_x) * 0.25)
+                padding_y = int((end_y - start_y) * 0.25)
+                start_x = max(0, start_x - padding_x)
+                start_y = max(0, start_y - padding_y)
+                end_x = min(vision_frame.shape[1], end_x + padding_x)
+                end_y = min(vision_frame.shape[0], end_y + padding_y)
+
+                # Crop face region
+                crop_vision_frame = vision_frame[start_y:end_y, start_x:end_x]
+
+                # Convert to binary and encode as base64
+                binary_face = self.frame_to_binary(crop_vision_frame)
+                binary_faces[str(index)] = base64.b64encode(binary_face).decode('utf-8')
+
+            # Clean up memory
+            clear_face_analyser()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+
+            return AnalyzeResponse(
+                success=True,
+                message=f"Successfully detected and extracted {len(binary_faces)} faces",
+                encoded_faces=binary_faces
+            )
+
+        except ImportError as e:
+            return AnalyzeResponse(
+                success=False,
+                message=f"FaceFusion modules not available: {str(e)}",
+                error_code=3
+            )
+        except Exception as e:
+            return AnalyzeResponse(
+                success=False,
+                message=f"Unexpected error during analysis: {str(e)}",
+                error_code=4
+            )

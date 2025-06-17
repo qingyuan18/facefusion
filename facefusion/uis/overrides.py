@@ -1,13 +1,46 @@
-from typing import Any
-import cv2
-import numpy
-import base64
+from gradio.processing_utils import video_is_playable
+
+from facefusion import ffmpeg_builder
+from facefusion.ffmpeg import run_ffmpeg
+from facefusion.filesystem import get_file_size
+from facefusion.temp_helper import create_temp_directory, get_temp_file_path
 
 
-def encode_array_to_base64(array : numpy.ndarray[Any, Any]) -> str:
-	buffer = cv2.imencode('.jpg', array[:, :, ::-1])[1]
-	return 'data:image/jpeg;base64,' + base64.b64encode(buffer.tobytes()).decode('utf-8')
+def convert_video_to_playable_mp4(video_path : str) -> str:
+	video_file_size = get_file_size(video_path)
+	max_file_size = 512 * 1024 * 1024
+
+	if video_file_size > max_file_size:
+		create_temp_directory(video_path)
+		temp_video_path = get_temp_file_path(video_path)
+		commands = ffmpeg_builder.chain(
+			ffmpeg_builder.set_input(video_path),
+			ffmpeg_builder.set_video_duration(10),
+			ffmpeg_builder.force_output(temp_video_path)
+		)
+
+		process = run_ffmpeg(commands)
+		process.communicate()
+
+		if process.returncode == 0:
+			return temp_video_path
+
+	if not video_is_playable(video_path):
+		create_temp_directory(video_path)
+		temp_video_path = get_temp_file_path(video_path)
+		commands = ffmpeg_builder.chain(
+			ffmpeg_builder.set_input(video_path),
+			ffmpeg_builder.force_output(temp_video_path)
+		)
+
+		process = run_ffmpeg(commands)
+		process.communicate()
+
+		if process.returncode == 0:
+			return temp_video_path
+
+	return video_path
 
 
-def encode_pil_to_base64(image : Any) -> str:
-	return encode_array_to_base64(numpy.asarray(image)[:, :, ::-1])
+def check_allowed(path : str, check_in_upload_folder : bool) -> None:
+	return None

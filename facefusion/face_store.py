@@ -1,14 +1,19 @@
-from typing import Optional, List
 import hashlib
+from typing import List, Optional
+
 import numpy
 
-from facefusion.typing import VisionFrame, Face, FaceStore, FaceSet
+from facefusion.types import Face, FaceSet, FaceStore, VisionFrame
 
-FACE_STORE: FaceStore =\
+FACE_STORE : FaceStore =\
 {
 	'static_faces': {},
 	'reference_faces': {}
 }
+
+
+def get_face_store() -> FaceStore:
+	return FACE_STORE
 
 
 def get_static_faces(vision_frame : VisionFrame) -> Optional[List[Face]]:
@@ -29,7 +34,10 @@ def clear_static_faces() -> None:
 
 
 def create_frame_hash(vision_frame : VisionFrame) -> Optional[str]:
-	return hashlib.sha1(vision_frame.tobytes()).hexdigest() if numpy.any(vision_frame) else None
+	if numpy.any(vision_frame):
+		frame_hash = hashlib.blake2b(vision_frame.tobytes(), digest_size = 16).hexdigest()
+		return frame_hash
+	return None
 
 
 def get_reference_faces() -> Optional[FaceSet]:
