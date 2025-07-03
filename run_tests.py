@@ -7,9 +7,32 @@ import sys
 import unittest
 from pathlib import Path
 
-# Add the project root to Python path
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
+# Clean Python path to avoid conflicts with other projects
+def clean_python_path():
+    """Remove potentially conflicting paths from sys.path"""
+    clean_paths = []
+    project_root = Path(__file__).parent
+
+    for path in sys.path:
+        # Skip paths that might contain conflicting modules
+        if '/home/ubuntu/tts/GPT-SoVITS' in path:
+            print(f"⚠️  Removing conflicting path: {path}")
+            continue
+        clean_paths.append(path)
+
+    # Clear and rebuild sys.path
+    sys.path.clear()
+    sys.path.extend(clean_paths)
+
+    # Ensure current project is first in path
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+
+    print(f"✅ Project root added to Python path: {project_root_str}")
+
+# Clean the Python path before importing anything else
+clean_python_path()
 
 
 def main():

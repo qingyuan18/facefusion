@@ -71,6 +71,30 @@ class FaceFusionService:
         except Exception as e:
             return False, f"Failed to download S3 paths: {str(e)}", request
 
+    def is_s3_output_path(self, output_path: str) -> bool:
+        """Check if output path is an S3 URL."""
+        try:
+            from facefusion.download import is_s3_path
+            return is_s3_path(output_path)
+        except ImportError:
+            return False
+
+    def upload_to_s3_if_needed(self, local_file_path: str, s3_output_path: str) -> Tuple[bool, str]:
+        """Upload local file to S3 if needed."""
+        try:
+            from facefusion.download import upload_file_if_needed
+
+            # Check if local file exists
+            if not os.path.exists(local_file_path):
+                return False, f"Local output file does not exist: {local_file_path}"
+
+            # Upload to S3
+            upload_file_if_needed(local_file_path, s3_output_path)
+            return True, "Successfully uploaded to S3"
+
+        except Exception as e:
+            return False, f"S3 upload failed: {str(e)}"
+
     def validate_paths(self, request: HeadlessRunRequest) -> Tuple[bool, str]:
         """Validate input paths."""
         # Check source paths
@@ -237,6 +261,9 @@ class FaceFusionService:
         # Generate job ID
         job_id = str(uuid.uuid4())
 
+        # Store original output path for S3 upload later
+        original_output_path = request.output_path
+
         # Download S3 paths if needed
         s3_success, s3_message, updated_request = self.download_s3_paths_if_needed(request)
         if not s3_success:
@@ -250,6 +277,19 @@ class FaceFusionService:
         # Use the updated request with local paths
         request = updated_request
 
+        # Handle S3 output path - convert to local path for processing
+        local_output_path = request.output_path
+        if self.is_s3_output_path(original_output_path):
+            # Generate local output path in /tmp
+            import tempfile
+            from facefusion.download import is_s3_path
+
+            if is_s3_path(original_output_path):
+                # Extract filename from S3 path
+                output_filename = os.path.basename(original_output_path)
+                local_output_path = os.path.join(tempfile.gettempdir(), f"{job_id}_{output_filename}")
+                request.output_path = local_output_path
+
         # Validate paths
         valid, message = self.validate_paths(request)
         if not valid:
@@ -259,15 +299,16 @@ class FaceFusionService:
                 message=message,
                 error_code=1
             )
-        
+
         # Build command
         cmd = self.build_command(request)
-        
+
         # Store job info
         self.jobs_storage[job_id] = {
             "status": "running",
             "command": cmd,
-            "output_path": request.output_path,
+            "output_path": original_output_path,  # Store original S3 path
+            "local_output_path": local_output_path,  # Store local path for processing
             "message": "Processing started"
         }
         
@@ -279,19 +320,46 @@ class FaceFusionService:
                 text=True,
                 timeout=3600  # 1 hour timeout
             )
-            
+
             if result.returncode == 0:
+                # Processing completed successfully, now handle S3 upload if needed
+                final_output_path = original_output_path
+
+                if self.is_s3_output_path(original_output_path):
+                    # Upload to S3
+                    upload_success, upload_message = self.upload_to_s3_if_needed(local_output_path, original_output_path)
+                    if not upload_success:
+                        self.jobs_storage[job_id].update({
+                            "status": "failed",
+                            "message": f"Processing completed but S3 upload failed: {upload_message}"
+                        })
+
+                        return HeadlessRunResponse(
+                            success=False,
+                            job_id=job_id,
+                            message=f"Processing completed but S3 upload failed: {upload_message}",
+                            error_code=2
+                        )
+
+                    # Clean up local file after successful upload
+                    try:
+                        if os.path.exists(local_output_path):
+                            os.remove(local_output_path)
+                    except Exception as e:
+                        # Log but don't fail the request
+                        print(f"Warning: Failed to clean up local file {local_output_path}: {e}")
+
                 # Success
                 self.jobs_storage[job_id].update({
                     "status": "completed",
                     "message": "Processing completed successfully"
                 })
-                
+
                 return HeadlessRunResponse(
                     success=True,
                     job_id=job_id,
                     message="Processing completed successfully",
-                    output_path=request.output_path
+                    output_path=final_output_path
                 )
             else:
                 # Error
@@ -300,7 +368,7 @@ class FaceFusionService:
                     "status": "failed",
                     "message": f"Processing failed: {error_message}"
                 })
-                
+
                 return HeadlessRunResponse(
                     success=False,
                     job_id=job_id,

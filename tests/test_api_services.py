@@ -15,6 +15,16 @@ import os
 import base64
 
 # Import the modules we want to test
+# Use absolute imports to avoid conflicts with other projects
+import sys
+import os
+from pathlib import Path
+
+# Ensure we're importing from the current project
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from api.services import FaceFusionService
 from api.models import HeadlessRunRequest, AnalyzeRequest
 
@@ -86,14 +96,19 @@ class TestAnalyzeEndpoint(TestFaceFusionService):
             
             # Execute
             response = self.service.execute_analyze(request)
-            
+
+            # Debug output
+            if not response.success:
+                print(f"❌ Analyze failed: {response.message}")
+                print(f"   Error code: {response.error_code}")
+
             # Assertions
-            self.assertTrue(response.success)
+            self.assertTrue(response.success, f"Analyze failed: {response.message}")
             self.assertIsNotNone(response.encoded_faces)
             self.assertEqual(len(response.encoded_faces), 2)
             self.assertIn("0", response.encoded_faces)
             self.assertIn("1", response.encoded_faces)
-            
+
             # Verify the base64 encoding
             for face_id, encoded_data in response.encoded_faces.items():
                 decoded_data = base64.b64decode(encoded_data)
@@ -128,13 +143,18 @@ class TestAnalyzeEndpoint(TestFaceFusionService):
             
             # Execute
             response = self.service.execute_analyze(request)
-            
+
+            # Debug output
+            if not response.success:
+                print(f"❌ Video analyze failed: {response.message}")
+                print(f"   Error code: {response.error_code}")
+
             # Assertions
-            self.assertTrue(response.success)
+            self.assertTrue(response.success, f"Video analyze failed: {response.message}")
             self.assertIsNotNone(response.encoded_faces)
             self.assertEqual(len(response.encoded_faces), 1)
             self.assertIn("0", response.encoded_faces)
-            
+
             # Verify S3 download was called
             mock_download.assert_called_once_with(self.test_s3_video)
             mock_read_video.assert_called_once_with(self.test_local_video, 0)

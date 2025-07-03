@@ -183,6 +183,7 @@ def download_s3_file(s3_path: str, local_directory: str = '/tmp') -> Optional[st
 	"""
 	Download a file from S3 to local directory.
 	Returns the local file path if successful, None otherwise.
+	Enhanced to avoid re-downloading existing files with proper size validation.
 	"""
 	try:
 		import boto3
@@ -201,26 +202,36 @@ def download_s3_file(s3_path: str, local_directory: str = '/tmp') -> Optional[st
 		file_name = os.path.basename(object_key)
 		local_file_path = os.path.join(local_directory, file_name)
 
-		# Check if file already exists and has content
-		if is_file(local_file_path) and get_file_size(local_file_path) > 0:
-			logger.info(f"File already exists locally: {local_file_path}", __name__)
-			return local_file_path
+		# Initialize S3 client
+		s3_client = boto3.client('s3')
+
+		# Get S3 file metadata for comparison
+		try:
+			s3_response = s3_client.head_object(Bucket=bucket_name, Key=object_key)
+			s3_file_size = s3_response['ContentLength']
+			s3_last_modified = s3_response['LastModified']
+		except ClientError as e:
+			logger.error(f"Failed to get S3 file metadata: {str(e)}", __name__)
+			return None
+
+		# Enhanced file existence check
+		if is_file(local_file_path):
+			local_file_size = get_file_size(local_file_path)
+
+			# Check if local file size matches S3 file size
+			if local_file_size == s3_file_size and local_file_size > 0:
+				logger.info(f"File already exists locally with correct size: {local_file_path} ({local_file_size} bytes)", __name__)
+				return local_file_path
+			elif local_file_size != s3_file_size:
+				logger.info(f"Local file size mismatch (local: {local_file_size}, S3: {s3_file_size}), re-downloading: {file_name}", __name__)
+			else:
+				logger.info(f"Local file is empty, re-downloading: {file_name}", __name__)
 
 		# Create directory if it doesn't exist
 		os.makedirs(local_directory, exist_ok=True)
 
-		# Initialize S3 client
-		s3_client = boto3.client('s3')
-
-		# Get file size for progress bar
-		try:
-			response = s3_client.head_object(Bucket=bucket_name, Key=object_key)
-			file_size = response['ContentLength']
-		except ClientError:
-			file_size = 0
-
 		# Download with progress bar
-		with tqdm(total=file_size, desc=f'Downloading {file_name}', unit='B', unit_scale=True, unit_divisor=1024, ascii=' =', disable=state_manager.get_item('log_level') in ['warn', 'error']) as progress:
+		with tqdm(total=s3_file_size, desc=f'Downloading {file_name}', unit='B', unit_scale=True, unit_divisor=1024, ascii=' =', disable=state_manager.get_item('log_level') in ['warn', 'error']) as progress:
 			def progress_callback(bytes_transferred):
 				progress.update(bytes_transferred - progress.n)
 
@@ -228,11 +239,17 @@ def download_s3_file(s3_path: str, local_directory: str = '/tmp') -> Optional[st
 				bucket_name,
 				object_key,
 				local_file_path,
-				Callback=progress_callback if file_size > 0 else None
+				Callback=progress_callback if s3_file_size > 0 else None
 			)
 
-		logger.info(f"Successfully downloaded {s3_path} to {local_file_path}", __name__)
-		return local_file_path
+		# Verify download completed successfully
+		final_size = get_file_size(local_file_path)
+		if final_size == s3_file_size:
+			logger.info(f"Successfully downloaded {s3_path} to {local_file_path} ({final_size} bytes)", __name__)
+			return local_file_path
+		else:
+			logger.error(f"Download verification failed: expected {s3_file_size} bytes, got {final_size} bytes", __name__)
+			return None
 
 	except ImportError:
 		logger.error("boto3 is required for S3 downloads. Install with: pip install boto3", __name__)
@@ -248,6 +265,65 @@ def download_s3_file(s3_path: str, local_directory: str = '/tmp') -> Optional[st
 		return None
 
 
+def upload_s3_file(local_file_path: str, s3_path: str) -> bool:
+	"""
+	Upload a local file to S3.
+	Returns True if successful, False otherwise.
+	"""
+	try:
+		import boto3
+		from botocore.exceptions import ClientError, NoCredentialsError
+
+		# Parse S3 path
+		parsed = urlparse(s3_path)
+		bucket_name = parsed.netloc
+		object_key = parsed.path.lstrip('/')
+
+		if not bucket_name or not object_key:
+			logger.error(f"Invalid S3 path: {s3_path}", __name__)
+			return False
+
+		# Check if local file exists
+		if not is_file(local_file_path):
+			logger.error(f"Local file does not exist: {local_file_path}", __name__)
+			return False
+
+		# Get local file size for progress bar
+		file_size = get_file_size(local_file_path)
+		file_name = os.path.basename(local_file_path)
+
+		# Initialize S3 client
+		s3_client = boto3.client('s3')
+
+		# Upload with progress bar
+		with tqdm(total=file_size, desc=f'Uploading {file_name}', unit='B', unit_scale=True, unit_divisor=1024, ascii=' =', disable=state_manager.get_item('log_level') in ['warn', 'error']) as progress:
+			def progress_callback(bytes_transferred):
+				progress.update(bytes_transferred)
+
+			s3_client.upload_file(
+				local_file_path,
+				bucket_name,
+				object_key,
+				Callback=progress_callback
+			)
+
+		logger.info(f"Successfully uploaded {local_file_path} to {s3_path} ({file_size} bytes)", __name__)
+		return True
+
+	except ImportError:
+		logger.error("boto3 is required for S3 uploads. Install with: pip install boto3", __name__)
+		return False
+	except NoCredentialsError:
+		logger.error("AWS credentials not found. Configure AWS credentials to upload to S3.", __name__)
+		return False
+	except ClientError as e:
+		logger.error(f"Failed to upload to S3: {str(e)}", __name__)
+		return False
+	except Exception as e:
+		logger.error(f"Unexpected error uploading to S3: {str(e)}", __name__)
+		return False
+
+
 def download_file_if_needed(file_path: str, local_directory: str = '/tmp') -> str:
 	"""
 	Download file if it's an S3 path, otherwise return the original path.
@@ -260,3 +336,16 @@ def download_file_if_needed(file_path: str, local_directory: str = '/tmp') -> st
 		else:
 			raise ValueError(f"Failed to download S3 file: {file_path}")
 	return file_path
+
+
+def upload_file_if_needed(local_file_path: str, output_path: str) -> str:
+	"""
+	Upload file to S3 if output_path is an S3 URL, otherwise return the original path.
+	Returns the final output path.
+	"""
+	if is_s3_path(output_path):
+		if upload_s3_file(local_file_path, output_path):
+			return output_path
+		else:
+			raise ValueError(f"Failed to upload file to S3: {output_path}")
+	return local_file_path
