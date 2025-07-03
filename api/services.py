@@ -17,7 +17,11 @@ from pathlib import Path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from api.models import HeadlessRunRequest, HeadlessRunResponse, JobStatusResponse, AnalyzeRequest, AnalyzeResponse
+from api.models import (
+    HeadlessRunRequest, HeadlessRunResponse, JobStatusResponse,
+    AnalyzeRequest, AnalyzeResponse, StreamProcessRequest,
+    StreamProcessResponse, StreamStatusResponse
+)
 
 
 class FaceFusionService:
@@ -532,3 +536,155 @@ class FaceFusionService:
                 message=f"Unexpected error during analysis: {str(e)}",
                 error_code=4
             )
+
+
+class StreamService:
+    """Service class for real-time stream processing operations."""
+
+    def __init__(self):
+        self.active_sessions = {}  # session_id -> StreamProcessor
+        self.session_tasks = {}    # session_id -> asyncio.Task
+
+    async def start_stream_processing(self, request: StreamProcessRequest) -> StreamProcessResponse:
+        """Start a new stream processing session."""
+        try:
+            # Import FaceFusion modules
+            sys.path.insert(0, project_root)
+            from facefusion.stream_processor import StreamProcessor
+            from facefusion import state_manager
+
+            # Configure FaceFusion state
+            if request.face_detector_model:
+                state_manager.set_item('face_detector_model', request.face_detector_model)
+            if request.face_detector_score:
+                state_manager.set_item('face_detector_score', request.face_detector_score)
+            if request.face_selector_mode:
+                state_manager.set_item('face_selector_mode', request.face_selector_mode)
+            if request.reference_face_distance:
+                state_manager.set_item('reference_face_distance', request.reference_face_distance)
+            if request.execution_providers:
+                state_manager.set_item('execution_providers', request.execution_providers)
+            if request.execution_thread_count:
+                state_manager.set_item('execution_thread_count', request.execution_thread_count)
+
+            # Create stream processor
+            processor = StreamProcessor(
+                source_face_path=request.source_face_path,
+                segment_duration=request.segment_duration,
+                max_workers=request.max_workers,
+                output_quality=request.output_quality
+            )
+
+            session_id = processor.get_session_id()
+
+            # Store session
+            self.active_sessions[session_id] = processor
+
+            # Start processing task
+            task = asyncio.create_task(
+                self._run_stream_processing(processor, request.stream_url, session_id)
+            )
+            self.session_tasks[session_id] = task
+
+            # Create WebSocket URL
+            websocket_url = f"/api/v1/stream/ws/{session_id}"
+
+            return StreamProcessResponse(
+                success=True,
+                session_id=session_id,
+                message="Stream processing started successfully",
+                websocket_url=websocket_url
+            )
+
+        except Exception as e:
+            return StreamProcessResponse(
+                success=False,
+                message=f"Failed to start stream processing: {str(e)}",
+                error_code=1
+            )
+
+    async def _run_stream_processing(self, processor: 'StreamProcessor', stream_url: str, session_id: str):
+        """Run the stream processing in the background."""
+        try:
+            async for segment_id, segment_data, metadata in processor.process_stream(stream_url):
+                # Processing continues in the background
+                # Segments are yielded through get_processed_segments
+                pass
+        except Exception as e:
+            print(f"Error in stream processing for session {session_id}: {e}")
+        finally:
+            # Clean up session
+            if session_id in self.active_sessions:
+                del self.active_sessions[session_id]
+            if session_id in self.session_tasks:
+                del self.session_tasks[session_id]
+
+    def get_stream_status(self, session_id: str) -> Optional[StreamStatusResponse]:
+        """Get status of a stream processing session."""
+        if session_id not in self.active_sessions:
+            return None
+
+        processor = self.active_sessions[session_id]
+        stats = processor.get_stats()
+
+        # Determine status
+        if processor.is_processing:
+            status = "active"
+        else:
+            status = "stopped"
+
+        return StreamStatusResponse(
+            session_id=session_id,
+            status=status,
+            message=f"Stream processing {status}",
+            segments_processed=stats.get('segments_processed', 0),
+            processing_fps=stats.get('processing_fps', 0.0)
+        )
+
+    async def stop_stream_processing(self, session_id: str) -> bool:
+        """Stop a stream processing session."""
+        if session_id not in self.active_sessions:
+            return False
+
+        try:
+            processor = self.active_sessions[session_id]
+            await processor.stop_async()
+
+            # Cancel task
+            if session_id in self.session_tasks:
+                task = self.session_tasks[session_id]
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+            # Clean up
+            if session_id in self.active_sessions:
+                del self.active_sessions[session_id]
+            if session_id in self.session_tasks:
+                del self.session_tasks[session_id]
+
+            return True
+
+        except Exception as e:
+            print(f"Error stopping stream processing for session {session_id}: {e}")
+            return False
+
+    def has_session(self, session_id: str) -> bool:
+        """Check if a session exists."""
+        return session_id in self.active_sessions
+
+    async def get_processed_segments(self, session_id: str):
+        """Get processed segments for a session (async generator)."""
+        if session_id not in self.active_sessions:
+            return
+
+        processor = self.active_sessions[session_id]
+
+        try:
+            async for segment_id, segment_data, metadata in processor.process_stream(""):
+                yield segment_id, segment_data, metadata
+        except Exception as e:
+            print(f"Error getting processed segments for session {session_id}: {e}")
+            return

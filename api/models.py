@@ -132,3 +132,58 @@ class HealthResponse(BaseModel):
     status: str = Field(..., description="Health status")
     version: Optional[str] = Field(default=None, description="FaceFusion version")
     message: str = Field(..., description="Health check message")
+
+
+class StreamProcessRequest(BaseModel):
+    """Request model for real-time stream processing endpoint."""
+
+    stream_url: str = Field(..., description="Stream URL (rtmp://, wss://, http://, etc.)")
+    source_face_path: str = Field(..., description="Path to source face image for swapping")
+
+    # Stream processing settings
+    segment_duration: Optional[float] = Field(default=5.0, ge=1.0, le=30.0, description="Duration of each video segment in seconds")
+    max_workers: Optional[int] = Field(default=4, ge=1, le=16, description="Maximum number of worker threads")
+
+    # Face processing settings
+    face_detector_model: Optional[str] = Field(default="yolo_face", description="Face detector model")
+    face_detector_score: Optional[float] = Field(default=0.5, ge=0.0, le=1.0, description="Face detector score threshold")
+    face_selector_mode: Optional[str] = Field(default="reference", description="Face selector mode")
+    reference_face_distance: Optional[float] = Field(default=0.3, ge=0.0, le=1.0, description="Reference face distance")
+
+    # Output settings
+    output_quality: Optional[int] = Field(default=80, ge=1, le=100, description="Output video quality")
+
+    # Execution settings
+    execution_providers: Optional[List[str]] = Field(default=None, description="Execution providers")
+    execution_thread_count: Optional[int] = Field(default=None, ge=1, description="Execution thread count")
+
+
+class StreamProcessResponse(BaseModel):
+    """Response model for stream processing endpoint."""
+
+    success: bool = Field(..., description="Whether the stream processing started successfully")
+    session_id: Optional[str] = Field(default=None, description="Session ID for tracking the stream")
+    message: str = Field(..., description="Response message")
+    websocket_url: Optional[str] = Field(default=None, description="WebSocket URL for receiving processed segments")
+    error_code: Optional[int] = Field(default=None, description="Error code if failed")
+
+
+class StreamSegmentData(BaseModel):
+    """Model for stream segment data."""
+
+    segment_id: str = Field(..., description="Unique segment identifier")
+    timestamp: float = Field(..., description="Segment timestamp")
+    duration: float = Field(..., description="Segment duration in seconds")
+    data: bytes = Field(..., description="Processed video segment data")
+    format: str = Field(default="mp4", description="Video format")
+
+
+class StreamStatusResponse(BaseModel):
+    """Response model for stream status endpoint."""
+
+    session_id: str = Field(..., description="Stream session ID")
+    status: str = Field(..., description="Stream status (active, stopped, error)")
+    message: Optional[str] = Field(default=None, description="Status message")
+    segments_processed: Optional[int] = Field(default=None, description="Number of segments processed")
+    processing_fps: Optional[float] = Field(default=None, description="Processing frames per second")
+    error_code: Optional[int] = Field(default=None, description="Error code if failed")

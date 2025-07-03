@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from functools import lru_cache
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy
 

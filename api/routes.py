@@ -2,8 +2,10 @@
 FastAPI routes for FaceFusion API.
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
 from typing import List
+import json
+import asyncio
 
 from api.models import (
     HeadlessRunRequest,
@@ -12,15 +14,19 @@ from api.models import (
     ProcessorsResponse,
     HealthResponse,
     AnalyzeRequest,
-    AnalyzeResponse
+    AnalyzeResponse,
+    StreamProcessRequest,
+    StreamProcessResponse,
+    StreamStatusResponse
 )
-from api.services import FaceFusionService
+from api.services import FaceFusionService, StreamService
 
 # Create router
 router = APIRouter(prefix="/api/v1", tags=["facefusion"])
 
-# Initialize service
+# Initialize services
 service = FaceFusionService()
+stream_service = StreamService()
 
 
 @router.post("/headless-run", response_model=HeadlessRunResponse)
@@ -120,3 +126,132 @@ async def health_check():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Health check failed: {str(e)}"
         )
+
+
+@router.post("/stream/start", response_model=StreamProcessResponse)
+async def start_stream_processing(request: StreamProcessRequest):
+    """
+    Start real-time stream processing with face swapping.
+
+    This endpoint starts processing a live video stream (RTMP, WebSocket, HTTP, etc.)
+    and returns a session ID for tracking. Processed segments can be received via WebSocket.
+    """
+    try:
+        response = await stream_service.start_stream_processing(request)
+        return response
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start stream processing: {str(e)}"
+        )
+
+
+@router.get("/stream/status/{session_id}", response_model=StreamStatusResponse)
+async def get_stream_status(session_id: str):
+    """
+    Get the status of a stream processing session.
+
+    Returns current status, statistics, and processing information for the given session.
+    """
+    try:
+        response = stream_service.get_stream_status(session_id)
+        if not response:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Stream session not found: {session_id}"
+            )
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting stream status: {str(e)}"
+        )
+
+
+@router.post("/stream/stop/{session_id}")
+async def stop_stream_processing(session_id: str):
+    """
+    Stop a stream processing session.
+
+    Gracefully stops the stream processing and cleans up resources.
+    """
+    try:
+        success = await stream_service.stop_stream_processing(session_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Stream session not found: {session_id}"
+            )
+        return {"message": f"Stream processing stopped for session: {session_id}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error stopping stream processing: {str(e)}"
+        )
+
+
+@router.websocket("/stream/ws/{session_id}")
+async def stream_websocket(websocket: WebSocket, session_id: str):
+    """
+    WebSocket endpoint for receiving processed video segments.
+
+    Clients connect to this endpoint to receive real-time processed video segments
+    from the specified stream processing session.
+    """
+    await websocket.accept()
+
+    try:
+        # Check if session exists
+        if not stream_service.has_session(session_id):
+            await websocket.send_text(json.dumps({
+                "error": f"Stream session not found: {session_id}"
+            }))
+            await websocket.close()
+            return
+
+        # Send initial status
+        await websocket.send_text(json.dumps({
+            "type": "status",
+            "message": f"Connected to stream session: {session_id}"
+        }))
+
+        # Stream processed segments
+        async for segment_id, segment_data, metadata in stream_service.get_processed_segments(session_id):
+            try:
+                # Send metadata first
+                await websocket.send_text(json.dumps({
+                    "type": "segment_metadata",
+                    "segment_id": segment_id,
+                    "metadata": metadata
+                }))
+
+                # Send binary segment data
+                await websocket.send_bytes(segment_data)
+
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": f"Error sending segment: {str(e)}"
+                }))
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": f"WebSocket error: {str(e)}"
+            }))
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
