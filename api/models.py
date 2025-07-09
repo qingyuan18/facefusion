@@ -63,6 +63,31 @@ class HeadlessRunRequest(BaseModel):
     # Processors
     processors: Optional[List[str]] = Field(default=["face_swapper"], description="List of processors to use")
 
+    # Face swapper settings
+    face_swapper_model: Optional[str] = Field(default="inswapper_128_fp16", description="Face swapper model")
+    face_swapper_pixel_boost: Optional[str] = Field(default=None, description="Face swapper pixel boost")
+
+    # Face enhancer settings
+    face_enhancer_model: Optional[str] = Field(default="gfpgan_1.4", description="Face enhancer model")
+    face_enhancer_blend: Optional[int] = Field(default=80, ge=0, le=100, description="Face enhancer blend percentage")
+    face_enhancer_weight: Optional[float] = Field(default=1.0, ge=0.0, le=1.0, description="Face enhancer weight")
+
+    # Frame enhancer settings
+    frame_enhancer_model: Optional[str] = Field(default="span_kendata_x4", description="Frame enhancer model")
+    frame_enhancer_blend: Optional[int] = Field(default=80, ge=0, le=100, description="Frame enhancer blend percentage")
+
+    # Age modifier settings
+    age_modifier_model: Optional[str] = Field(default="styleganex_age", description="Age modifier model")
+    age_modifier_direction: Optional[int] = Field(default=0, ge=-100, le=100, description="Age modifier direction")
+
+    # Lip syncer settings
+    lip_syncer_model: Optional[str] = Field(default="wav2lip_gan_96", description="Lip syncer model")
+
+    # Frame colorizer settings
+    frame_colorizer_model: Optional[str] = Field(default="ddcolor", description="Frame colorizer model")
+    frame_colorizer_size: Optional[str] = Field(default="256x256", description="Frame colorizer size")
+    frame_colorizer_blend: Optional[int] = Field(default=100, ge=0, le=100, description="Frame colorizer blend percentage")
+
     # Many faces mapping (for multi-face swapping)
     faces_mapping: Optional[Dict[str, str]] = Field(default=None, description="Mapping of face indices to base64 encoded face data")
     
@@ -149,6 +174,9 @@ class StreamProcessRequest(BaseModel):
     face_detector_score: Optional[float] = Field(default=0.5, ge=0.0, le=1.0, description="Face detector score threshold")
     face_selector_mode: Optional[str] = Field(default="reference", description="Face selector mode")
     reference_face_distance: Optional[float] = Field(default=0.3, ge=0.0, le=1.0, description="Reference face distance")
+    face_swapper_model: Optional[str] = Field(default="inswapper_128_fp16", description="Face swapper model")
+    face_enhancer_model: Optional[str] = Field(default="gfpgan_1.4", description="Face enhancer model")
+    face_enhancer_blend: Optional[int] = Field(default=80, ge=0, le=100, description="Face enhancer blend percentage")
 
     # Output settings
     output_quality: Optional[int] = Field(default=80, ge=1, le=100, description="Output video quality")

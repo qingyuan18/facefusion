@@ -29,7 +29,7 @@ class FaceFusionService:
     
     def __init__(self):
         self.jobs_storage = {}  # In-memory job storage (in production, use Redis or database)
-        self.facefusion_script = "facefusion.py"
+        self.facefusion_script = os.path.join(project_root, "facefusion.py")
         
     def get_available_processors(self) -> List[str]:
         """Get list of available processors."""
@@ -123,17 +123,44 @@ class FaceFusionService:
     def build_command(self, request: HeadlessRunRequest) -> List[str]:
         """Build the facefusion command from request parameters."""
         cmd = [sys.executable, self.facefusion_script, "headless-run"]
-        
-        # Add source paths
-        cmd.extend(["-s"] + request.source_paths)
+
+        # Smart defaults based on processors
+        processors = request.processors or []
+
+        # Adjust face_selector_mode based on processors if not explicitly set
+        if not hasattr(request, '_face_selector_mode_set'):
+            if any(proc in processors for proc in ['age_modifier', 'face_enhancer', 'frame_enhancer']) and 'face_swapper' not in processors:
+                # For processors that don't need reference faces, use 'one' mode
+                request.face_selector_mode = 'one'
+            # For face_swapper or mixed scenarios, keep 'reference' (default)
+
+        # Add source paths (only if needed)
+        if request.source_paths and (request.face_selector_mode == 'reference' or 'face_swapper' in processors):
+            cmd.extend(["-s"] + request.source_paths)
         
         # Add target and output paths
         cmd.extend(["-t", request.target_path])
-        cmd.extend(["-o", request.output_path])
+
+        # Handle output path - if it's a directory, generate a filename
+        output_path = request.output_path
+        if output_path.endswith('/'):
+            # Extract target filename and use it for output
+            import os
+            target_name = os.path.basename(request.target_path)
+            if target_name:
+                # Remove extension and add processed suffix
+                name_without_ext = os.path.splitext(target_name)[0]
+                ext = os.path.splitext(target_name)[1] or '.mp4'
+                output_path = output_path + name_without_ext + '_processed' + ext
+            else:
+                # Fallback filename
+                output_path = output_path + 'output.mp4'
+
+        cmd.extend(["-o", output_path])
         
-        # Add optional configuration
-        if request.config_path and request.config_path != "facefusion.ini":
-            cmd.extend(["--config-path", request.config_path])
+        # Add configuration path (always include it to ensure proper initialization)
+        config_path = request.config_path or "facefusion.ini"
+        cmd.extend(["--config-path", config_path])
         
         if request.temp_path:
             cmd.extend(["--temp-path", request.temp_path])
@@ -229,6 +256,60 @@ class FaceFusionService:
         if request.processors:
             cmd.extend(["--processors"] + request.processors)
 
+        # Only add processor-specific parameters if the processor is being used
+        processors = request.processors or []
+
+        # Face swapper settings
+        if "face_swapper" in processors:
+            if request.face_swapper_model:
+                cmd.extend(["--face-swapper-model", request.face_swapper_model])
+
+            if request.face_swapper_pixel_boost:
+                cmd.extend(["--face-swapper-pixel-boost", request.face_swapper_pixel_boost])
+
+        # Face enhancer settings
+        if "face_enhancer" in processors:
+            if request.face_enhancer_model:
+                cmd.extend(["--face-enhancer-model", request.face_enhancer_model])
+
+            if request.face_enhancer_blend is not None:
+                cmd.extend(["--face-enhancer-blend", str(request.face_enhancer_blend)])
+
+            if request.face_enhancer_weight is not None:
+                cmd.extend(["--face-enhancer-weight", str(request.face_enhancer_weight)])
+
+        # Frame enhancer settings
+        if "frame_enhancer" in processors:
+            if request.frame_enhancer_model:
+                cmd.extend(["--frame-enhancer-model", request.frame_enhancer_model])
+
+            if request.frame_enhancer_blend is not None:
+                cmd.extend(["--frame-enhancer-blend", str(request.frame_enhancer_blend)])
+
+        # Age modifier settings
+        if "age_modifier" in processors:
+            if request.age_modifier_model:
+                cmd.extend(["--age-modifier-model", request.age_modifier_model])
+
+            if request.age_modifier_direction is not None:
+                cmd.extend(["--age-modifier-direction", str(request.age_modifier_direction)])
+
+        # Lip syncer settings
+        if "lip_syncer" in processors:
+            if request.lip_syncer_model:
+                cmd.extend(["--lip-syncer-model", request.lip_syncer_model])
+
+        # Frame colorizer settings
+        if "frame_colorizer" in processors:
+            if request.frame_colorizer_model:
+                cmd.extend(["--frame-colorizer-model", request.frame_colorizer_model])
+
+            if request.frame_colorizer_size:
+                cmd.extend(["--frame-colorizer-size", request.frame_colorizer_size])
+
+            if request.frame_colorizer_blend is not None:
+                cmd.extend(["--frame-colorizer-blend", str(request.frame_colorizer_blend)])
+
         # Many faces mapping
         if request.faces_mapping:
             faces_mapping_json = json.dumps(request.faces_mapping)
@@ -307,6 +388,18 @@ class FaceFusionService:
         # Build command
         cmd = self.build_command(request)
 
+        # Print the complete command for debugging
+        print("=" * 80)
+        print("FACEFUSION COMMAND EXECUTION")
+        print("=" * 80)
+        print(f"Job ID: {job_id}")
+        print(f"Command ({len(cmd)} arguments):")
+        for i, arg in enumerate(cmd):
+            print(f"  {i:2d}: {arg}")
+        print("\nComplete command line:")
+        print(" ".join(cmd))
+        print("=" * 80)
+
         # Store job info
         self.jobs_storage[job_id] = {
             "status": "running",
@@ -315,7 +408,7 @@ class FaceFusionService:
             "local_output_path": local_output_path,  # Store local path for processing
             "message": "Processing started"
         }
-        
+
         try:
             # Execute command
             result = subprocess.run(
@@ -324,6 +417,21 @@ class FaceFusionService:
                 text=True,
                 timeout=3600  # 1 hour timeout
             )
+
+            # Print execution results
+            print("\nEXECUTION RESULTS:")
+            print(f"Return code: {result.returncode}")
+            if result.stdout:
+                print("STDOUT:")
+                print(result.stdout[:1000])  # First 1000 chars
+                if len(result.stdout) > 1000:
+                    print("... (truncated)")
+            if result.stderr:
+                print("STDERR:")
+                print(result.stderr[:1000])  # First 1000 chars
+                if len(result.stderr) > 1000:
+                    print("... (truncated)")
+            print("=" * 80)
 
             if result.returncode == 0:
                 # Processing completed successfully, now handle S3 upload if needed
@@ -562,6 +670,12 @@ class StreamService:
                 state_manager.set_item('face_selector_mode', request.face_selector_mode)
             if request.reference_face_distance:
                 state_manager.set_item('reference_face_distance', request.reference_face_distance)
+            if request.face_swapper_model:
+                state_manager.set_item('face_swapper_model', request.face_swapper_model)
+            if request.face_enhancer_model:
+                state_manager.set_item('face_enhancer_model', request.face_enhancer_model)
+            if request.face_enhancer_blend is not None:
+                state_manager.set_item('face_enhancer_blend', request.face_enhancer_blend)
             if request.execution_providers:
                 state_manager.set_item('execution_providers', request.execution_providers)
             if request.execution_thread_count:

@@ -13,6 +13,9 @@ from contextlib import asynccontextmanager
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
+# Change working directory to project root so facefusion.py can find its dependencies
+os.chdir(project_root)
+
 from api.routes import router
 
 
@@ -82,7 +85,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "api.main:app",
         host="0.0.0.0",
-        port=8080,
+        port=8288,
         reload=True,
         log_level="info"
     )
