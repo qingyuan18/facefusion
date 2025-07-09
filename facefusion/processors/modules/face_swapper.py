@@ -368,13 +368,15 @@ def register_args(program : ArgumentParser) -> None:
 		face_swapper_pixel_boost_choices = processors_choices.face_swapper_set.get(known_args.face_swapper_model)
 		group_processors.add_argument('--face-swapper-pixel-boost', help = wording.get('help.face_swapper_pixel_boost'), default = config.get_str_value('processors', 'face_swapper_pixel_boost', get_first(face_swapper_pixel_boost_choices)), choices = face_swapper_pixel_boost_choices)
 		group_processors.add_argument('--many', help = 'JSON mapping of face indices to base64 encoded face data for multi-face swapping', default = None)
-		facefusion.jobs.job_store.register_step_keys([ 'face_swapper_model', 'face_swapper_pixel_boost', 'many' ])
+		group_processors.add_argument('--many-file', help = 'Path to JSON file containing face indices to base64 encoded face data mapping for multi-face swapping', default = None)
+		facefusion.jobs.job_store.register_step_keys([ 'face_swapper_model', 'face_swapper_pixel_boost', 'many', 'many_file' ])
 
 
 def apply_args(args : Args, apply_state_item : ApplyStateItem) -> None:
 	apply_state_item('face_swapper_model', args.get('face_swapper_model'))
 	apply_state_item('face_swapper_pixel_boost', args.get('face_swapper_pixel_boost'))
 	apply_state_item('many', args.get('many'))
+	apply_state_item('many_file', args.get('many_file'))
 
 
 def pre_check() -> bool:
@@ -578,30 +580,31 @@ def find_most_similar_face(target_faces: List[Face], reference_face: Face, simil
 	"""
 	Find the most similar face from target_faces to the reference_face.
 	Returns the most similar face if similarity is above threshold, None otherwise.
+
+	Uses the same distance calculation as face_selector.py for consistency.
 	"""
-	from facefusion.face_selector import compare_faces
+	from facefusion.face_selector import calc_face_distance
+	import numpy
 
 	if not target_faces:
 		return None
 
 	best_face = None
-	best_similarity = float('inf')  # Lower distance means higher similarity
+	best_distance = float('inf')  # Lower distance means higher similarity
 
 	for target_face in target_faces:
-		# compare_faces returns True if faces are similar (distance < threshold)
-		# We need to calculate actual distance for comparison
 		try:
-			# Calculate embedding distance directly
-			distance = numpy.linalg.norm(target_face.normed_embedding - reference_face.normed_embedding)
+			# Use the same distance calculation as face_selector.py
+			distance = calc_face_distance(target_face, reference_face)
+			# Normalize distance to [0, 1] range like in compare_faces
+			normalized_distance = float(numpy.interp(distance, [0, 2], [0, 1]))
 
-			if distance < best_similarity and distance <= similarity_threshold:
-				best_similarity = distance
+			if normalized_distance < best_distance and normalized_distance < similarity_threshold:
+				best_distance = normalized_distance
 				best_face = target_face
 		except Exception:
-			# Fallback to original compare_faces method
-			if compare_faces(target_face, reference_face, similarity_threshold):
-				if best_face is None:
-					best_face = target_face
+			# Skip faces that cause errors in distance calculation
+			continue
 
 	return best_face
 
@@ -639,10 +642,22 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 
 	# Check if many faces mapping is provided
 	faces_mapping_json = state_manager.get_item('many')
+	faces_mapping_file = state_manager.get_item('many_file')
+	faces_mapping_dict = None
 
 	if faces_mapping_json:
-		# Parse the faces mapping JSON
+		# Parse the faces mapping JSON from command line argument
 		faces_mapping_dict = json.loads(faces_mapping_json)
+	elif faces_mapping_file:
+		# Read faces mapping from file
+		try:
+			with open(faces_mapping_file, 'r') as f:
+				faces_mapping_dict = json.load(f)
+		except Exception as e:
+			print(f"Error reading faces mapping file {faces_mapping_file}: {e}")
+			return
+
+	if faces_mapping_dict:
 
 		# Get source faces from input images
 		source_frames = read_static_images(source_paths)
@@ -725,10 +740,22 @@ def process_image(source_paths : List[str], target_path : str, output_path : str
 
 	# Check if many faces mapping is provided
 	faces_mapping_json = state_manager.get_item('many')
+	faces_mapping_file = state_manager.get_item('many_file')
+	faces_mapping_dict = None
 
 	if faces_mapping_json:
-		# Parse the faces mapping JSON
+		# Parse the faces mapping JSON from command line argument
 		faces_mapping_dict = json.loads(faces_mapping_json)
+	elif faces_mapping_file:
+		# Read faces mapping from file
+		try:
+			with open(faces_mapping_file, 'r') as f:
+				faces_mapping_dict = json.load(f)
+		except Exception as e:
+			print(f"Error reading faces mapping file {faces_mapping_file}: {e}")
+			return
+
+	if faces_mapping_dict:
 
 		# Get source faces from input images
 		source_frames = read_static_images(source_paths)

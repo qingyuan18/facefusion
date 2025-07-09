@@ -31,7 +31,7 @@ class HeadlessRunRequest(BaseModel):
     # Face selector settings
     face_selector_mode: Optional[str] = Field(default="reference", description="Face selector mode")
     face_selector_order: Optional[str] = Field(default="large-small", description="Face selector order")
-    reference_face_distance: Optional[float] = Field(default=0.3, ge=0.0, le=1.0, description="Reference face distance")
+    reference_face_distance: Optional[float] = Field(default=0.6, ge=0.0, le=1.0, description="Reference face distance")
     reference_frame_number: Optional[int] = Field(default=0, ge=0, description="Reference frame number")
     
     # Face masker settings
@@ -173,7 +173,7 @@ class StreamProcessRequest(BaseModel):
     face_detector_model: Optional[str] = Field(default="yolo_face", description="Face detector model")
     face_detector_score: Optional[float] = Field(default=0.5, ge=0.0, le=1.0, description="Face detector score threshold")
     face_selector_mode: Optional[str] = Field(default="reference", description="Face selector mode")
-    reference_face_distance: Optional[float] = Field(default=0.3, ge=0.0, le=1.0, description="Reference face distance")
+    reference_face_distance: Optional[float] = Field(default=0.6, ge=0.0, le=1.0, description="Reference face distance")
     face_swapper_model: Optional[str] = Field(default="inswapper_128_fp16", description="Face swapper model")
     face_enhancer_model: Optional[str] = Field(default="gfpgan_1.4", description="Face enhancer model")
     face_enhancer_blend: Optional[int] = Field(default=80, ge=0, le=100, description="Face enhancer blend percentage")

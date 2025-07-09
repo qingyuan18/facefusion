@@ -26,10 +26,11 @@ from api.models import (
 
 class FaceFusionService:
     """Service class for FaceFusion operations."""
-    
+
     def __init__(self):
         self.jobs_storage = {}  # In-memory job storage (in production, use Redis or database)
         self.facefusion_script = os.path.join(project_root, "facefusion.py")
+        self.temp_faces_mapping_files = {}  # Track temporary faces mapping files for cleanup
         
     def get_available_processors(self) -> List[str]:
         """Get list of available processors."""
@@ -119,9 +120,60 @@ class FaceFusionService:
                 return False, f"Cannot create output directory: {e}"
 
         return True, "Paths validated successfully"
+
+    def create_temp_faces_mapping_file(self, faces_mapping: Dict[str, str], job_id: str) -> str:
+        """Create a temporary file containing faces mapping JSON data.
+
+        Args:
+            faces_mapping: Dictionary mapping face indices to base64 encoded face data
+            job_id: Job ID for tracking and cleanup
+
+        Returns:
+            Path to the temporary file containing the faces mapping JSON
+        """
+        # Create a temporary file with a unique name
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.json', prefix=f'faces_mapping_{job_id}_')
+
+        try:
+            # Write the faces mapping JSON to the temporary file
+            with os.fdopen(temp_fd, 'w') as temp_file:
+                json.dump(faces_mapping, temp_file)
+
+            # Track the temporary file for cleanup
+            self.temp_faces_mapping_files[job_id] = temp_path
+
+            return temp_path
+        except Exception as e:
+            # Clean up the file descriptor if something goes wrong
+            try:
+                os.close(temp_fd)
+            except:
+                pass
+            raise e
+
+    def cleanup_temp_faces_mapping_file(self, job_id: str) -> None:
+        """Clean up temporary faces mapping file for a job.
+
+        Args:
+            job_id: Job ID to clean up
+        """
+        if job_id in self.temp_faces_mapping_files:
+            temp_path = self.temp_faces_mapping_files[job_id]
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception as e:
+                print(f"Warning: Failed to remove temporary faces mapping file {temp_path}: {e}")
+            finally:
+                del self.temp_faces_mapping_files[job_id]
     
-    def build_command(self, request: HeadlessRunRequest) -> List[str]:
-        """Build the facefusion command from request parameters."""
+    def build_command(self, request: HeadlessRunRequest, job_id: str = None) -> List[str]:
+        """Build the facefusion command from request parameters.
+
+        Args:
+            request: The headless run request
+            job_id: Job ID for tracking temporary files (required if faces_mapping is provided)
+        """
         cmd = [sys.executable, self.facefusion_script, "headless-run"]
 
         # Smart defaults based on processors
@@ -312,8 +364,11 @@ class FaceFusionService:
 
         # Many faces mapping
         if request.faces_mapping:
-            faces_mapping_json = json.dumps(request.faces_mapping)
-            cmd.extend(["--many", faces_mapping_json])
+            if job_id is None:
+                raise ValueError("job_id is required when faces_mapping is provided")
+            # Create temporary file for faces mapping to avoid command line length limits
+            temp_faces_mapping_path = self.create_temp_faces_mapping_file(request.faces_mapping, job_id)
+            cmd.extend(["--many-file", temp_faces_mapping_path])
         
         # Execution settings
         if request.execution_device_id:
@@ -386,7 +441,7 @@ class FaceFusionService:
             )
 
         # Build command
-        cmd = self.build_command(request)
+        cmd = self.build_command(request, job_id)
 
         # Print the complete command for debugging
         print("=" * 80)
@@ -446,6 +501,9 @@ class FaceFusionService:
                             "message": f"Processing completed but S3 upload failed: {upload_message}"
                         })
 
+                        # Clean up temporary faces mapping file
+                        self.cleanup_temp_faces_mapping_file(job_id)
+
                         return HeadlessRunResponse(
                             success=False,
                             job_id=job_id,
@@ -467,6 +525,9 @@ class FaceFusionService:
                     "message": "Processing completed successfully"
                 })
 
+                # Clean up temporary faces mapping file
+                self.cleanup_temp_faces_mapping_file(job_id)
+
                 return HeadlessRunResponse(
                     success=True,
                     job_id=job_id,
@@ -481,6 +542,9 @@ class FaceFusionService:
                     "message": f"Processing failed: {error_message}"
                 })
 
+                # Clean up temporary faces mapping file
+                self.cleanup_temp_faces_mapping_file(job_id)
+
                 return HeadlessRunResponse(
                     success=False,
                     job_id=job_id,
@@ -493,7 +557,10 @@ class FaceFusionService:
                 "status": "failed",
                 "message": "Processing timed out"
             })
-            
+
+            # Clean up temporary faces mapping file
+            self.cleanup_temp_faces_mapping_file(job_id)
+
             return HeadlessRunResponse(
                 success=False,
                 job_id=job_id,
@@ -506,7 +573,10 @@ class FaceFusionService:
                 "status": "failed",
                 "message": f"Unexpected error: {str(e)}"
             })
-            
+
+            # Clean up temporary faces mapping file
+            self.cleanup_temp_faces_mapping_file(job_id)
+
             return HeadlessRunResponse(
                 success=False,
                 job_id=job_id,
@@ -543,13 +613,36 @@ class FaceFusionService:
         """Execute face analysis on target image/video."""
         try:
             # Import FaceFusion modules
-            import facefusion.globals
+            from facefusion import state_manager, face_detector, face_landmarker, face_recognizer, face_classifier
             from facefusion.filesystem import is_video
             from facefusion.vision import read_image, read_video_frame
             from facefusion.face_analyser import get_many_faces
             from facefusion.face_detector import clear_inference_pool as clear_face_analyser
             from facefusion.download import download_file_if_needed, is_s3_path
             import torch
+
+            # Initialize FaceFusion state if not already done
+            if not hasattr(self, '_facefusion_initialized'):
+                # Set default state values
+                state_manager.init_item('face_detector_model', 'yolo_face')
+                state_manager.init_item('face_detector_score', 0.5)
+                state_manager.init_item('face_detector_size', '640x640')
+                state_manager.init_item('face_detector_angles', [0])
+                state_manager.init_item('face_landmarker_model', 'many')
+                state_manager.init_item('face_landmarker_score', 0.5)
+                state_manager.init_item('execution_providers', ['cpu'])
+                state_manager.init_item('execution_device_id', '0')
+                state_manager.init_item('execution_thread_count', 4)
+                state_manager.init_item('download_providers', ['github'])
+                state_manager.init_item('download_scope', 'full')
+
+                # Pre-check and initialize models
+                face_detector.pre_check()
+                face_landmarker.pre_check()
+                face_recognizer.pre_check()
+                face_classifier.pre_check()
+
+                self._facefusion_initialized = True
 
             # Download S3 file if needed
             target_path = request.target_path
