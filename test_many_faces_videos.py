@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Complete script to:
-1. Call FaceFusion analyze API to extract faces
+1. Call FaceFusion analyze API to extract faces from video
 2. Save face images as PNG files
-3. Use extracted faces for multi-face swapping
+3. Use extracted faces for multi-face video swapping
 """
 
 import requests
@@ -11,10 +11,12 @@ import base64
 import os
 from datetime import datetime
 import time
+import random
+import json
 
 # Step 1: Analyze API 参数
 ANALYZE_API_URL = "http://ec2-18-237-35-34.us-west-2.compute.amazonaws.com:8288/api/v1/analyze"
-TARGET_PATH = "s3://facefusiondemo/41a13dad-99d1-4cf0-b9fb-58712fd10f70_WeChat_20240709163338.mp4"
+TARGET_PATH = "s3://facefusiondemo/videos/3faces_video01.mp4"
 FRAME_NUMBER = 80
 OUTPUT_DIR = "./extracted_faces"
 
@@ -25,8 +27,34 @@ AVAILABLE_SOURCE_PATHS = [
     "/home/ubuntu/facefusion/musk.jpg",
     "/home/ubuntu/facefusion/tangyan.jpg"
 ]
+AVAILABLE_SOURCE_PATHS = [
+    "/home/ubuntu/facefusion/musk.jpg",
+    "s3://facefusiondemo/input/source02.jpeg"
+]
 OUTPUT_PATH = "s3://facefusiondemo/output/video.mp4"
-TARGET_VIDEO_PATH = "s3://facefusiondemo/41a13dad-99d1-4cf0-b9fb-58712fd10f70_WeChat_20240709163338.mp4"
+TARGET_VIDEO_PATH = "s3://facefusiondemo/videos/3faces_video01.mp4"
+
+def create_debug_faces_mapping(filtered_faces_mapping):
+    """创建包含调试信息的人脸映射文件"""
+    debug_mapping = {}
+
+    for key, base64_data in filtered_faces_mapping.items():
+        debug_mapping[key] = {
+            "base64_data": base64_data,
+            "debug_info": {
+                "source_index": key,
+                "timestamp": datetime.now().isoformat(),
+                "enable_similarity_debug": True
+            }
+        }
+
+    # 保存调试映射到文件
+    debug_file_path = "./debug_faces_mapping.json"
+    with open(debug_file_path, 'w') as f:
+        json.dump(debug_mapping, f, indent=2)
+
+    print(f"调试人脸映射已保存到: {debug_file_path}")
+    return debug_file_path
 
 def analyze_faces():
     """Step 1: 分析视频并提取人脸"""
@@ -48,7 +76,7 @@ def analyze_faces():
 
     try:
         # 调用API
-        response = requests.post(ANALYZE_API_URL, headers=headers, json=payload, timeout=60)
+        response = requests.post(ANALYZE_API_URL, headers=headers, json=payload, timeout=120)
         response.raise_for_status()
         result = response.json()
 
@@ -110,26 +138,53 @@ def face_swap(faces_mapping):
     print("Step 2: 调用 FaceFusion Headless-Run API 进行多人换脸")
     print("=" * 60)
 
-    # 根据检测到的人脸数量动态选择源图像
+    # 根据检测到的人脸数量和可用源图像数量动态选择
     face_count = len(faces_mapping)
-    source_paths = AVAILABLE_SOURCE_PATHS[:face_count]  # 只取需要的数量
+    available_source_count = len(AVAILABLE_SOURCE_PATHS)
 
-    print(f"检测到 {face_count} 张人脸，使用 {len(source_paths)} 张源图像")
-    print(f"Source paths: {source_paths}")
+    print(f"检测到 {face_count} 张人脸，可用源图像 {available_source_count} 张")
     print(f"Target path: {TARGET_VIDEO_PATH}")
     print(f"Output path: {OUTPUT_PATH}")
-    print(f"Face mapping: {list(faces_mapping.keys())}")
+    print(f"检测到的人脸ID: {list(faces_mapping.keys())}")
 
-    # 如果只有一张人脸，只使用第一张人脸的mapping
-    if face_count == 1:
-        # 只保留第一张人脸的mapping
-        filtered_faces_mapping = {"0": faces_mapping.get("0", list(faces_mapping.values())[0])}
-        print("单人脸模式：只使用第一张检测到的人脸")
-    else:
+    # 根据人脸数量和源图像数量的关系决定处理策略
+    if face_count <= available_source_count:
+        # 人脸数量不超过源图像数量，使用所有检测到的人脸
+        source_paths = AVAILABLE_SOURCE_PATHS[:face_count]
         filtered_faces_mapping = faces_mapping
-        print(f"多人脸模式：使用所有 {face_count} 张检测到的人脸")
+        print(f"使用所有 {face_count} 张检测到的人脸")
+    else:
+        # 人脸数量超过源图像数量，随机选择人脸进行映射
+        source_paths = AVAILABLE_SOURCE_PATHS  # 使用所有可用的源图像
 
-    # 准备换脸请求
+        # 从检测到的人脸中随机选择与源图像数量相等的人脸
+        detected_face_ids = list(faces_mapping.keys())
+        selected_face_ids = random.sample(detected_face_ids, available_source_count)
+
+        # 创建新的映射，保持清晰的对应关系
+        filtered_faces_mapping = {}
+        for i, face_id in enumerate(selected_face_ids):
+            filtered_faces_mapping[str(i)] = faces_mapping[face_id]
+
+        print(f"人脸数量({face_count})超过源图像数量({available_source_count})")
+        print(f"随机选择的原视频人脸ID: {selected_face_ids}")
+
+        # 打印清晰的映射关系
+        print("\n=== 详细人脸映射信息 ===")
+        print("映射逻辑：源图像[新索引] -> 原视频人脸[原始ID]")
+        for i, face_id in enumerate(selected_face_ids):
+            base64_preview = faces_mapping[face_id][:50] + "..." if len(faces_mapping[face_id]) > 50 else faces_mapping[face_id]
+            print(f"源图像[{i}] ({source_paths[i]}) -> 原视频人脸[{face_id}] (base64: {base64_preview})")
+
+        print(f"\n最终API映射键值: {list(filtered_faces_mapping.keys())} (对应原视频人脸: {selected_face_ids})")
+
+    print(f"使用的源图像路径: {source_paths}")
+    print(f"最终人脸映射: {list(filtered_faces_mapping.keys())}")
+
+    # 创建调试人脸映射文件（可选）
+    # debug_file_path = create_debug_faces_mapping(filtered_faces_mapping)
+
+    # 准备换脸请求 - 使用降低的阈值
     payload = {
         "source_paths": source_paths,
         "output_path": OUTPUT_PATH,
@@ -137,8 +192,22 @@ def face_swap(faces_mapping):
         "processors": ["face_swapper"],
         "face_selector_mode": "reference",
         "faces_mapping": filtered_faces_mapping,
-        "reference_face_distance": 0.6
+        "reference_face_distance": 0.35
     }
+
+    # 打印完整的请求信息用于调试
+    print("\n=== API 请求详情 ===")
+    print(f"API URL: {HEADLESS_API_URL}")
+    print(f"Source paths: {payload['source_paths']}")
+    print(f"Target path: {payload['target_path']}")
+    print(f"Output path: {payload['output_path']}")
+    print(f"Face selector mode: {payload['face_selector_mode']}")
+    print(f"Reference face distance: {payload['reference_face_distance']}")
+    print(f"Faces mapping keys: {list(payload['faces_mapping'].keys())}")
+
+    # 打印每个人脸映射的base64数据长度
+    for key, base64_data in payload['faces_mapping'].items():
+        print(f"  映射[{key}]: base64长度={len(base64_data)}, 预览={base64_data[:30]}...")
 
     headers = {
         "Content-Type": "application/json"
@@ -147,7 +216,12 @@ def face_swap(faces_mapping):
     try:
         # 调用换脸API
         print("正在提交换脸请求...")
-        response = requests.post(HEADLESS_API_URL, headers=headers, json=payload, timeout=120)
+        print("⚠️  多人脸换脸处理时间较长，请耐心等待...")
+        print(f"⏱️  超时设置: 300秒 (5分钟)")
+        print(f"🎬 目标视频: {TARGET_VIDEO_PATH}")
+        print(f"📊 处理参数: {len(source_paths)}个源图像, 阈值={payload['reference_face_distance']}")
+
+        response = requests.post(HEADLESS_API_URL, headers=headers, json=payload, timeout=300)
         response.raise_for_status()
         result = response.json()
 

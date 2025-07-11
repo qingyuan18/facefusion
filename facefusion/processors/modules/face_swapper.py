@@ -587,24 +587,45 @@ def find_most_similar_face(target_faces: List[Face], reference_face: Face, simil
 	import numpy
 
 	if not target_faces:
+		print("  [调试] 当前帧未检测到任何人脸")
 		return None
 
 	best_face = None
 	best_distance = float('inf')  # Lower distance means higher similarity
 
-	for target_face in target_faces:
+	print(f"  [调试] 开始相似度比较 - 阈值: {similarity_threshold}")
+	print(f"  [调试] 当前帧检测到 {len(target_faces)} 张人脸")
+
+	for i, target_face in enumerate(target_faces):
 		try:
 			# Use the same distance calculation as face_selector.py
 			distance = calc_face_distance(target_face, reference_face)
 			# Normalize distance to [0, 1] range like in compare_faces
 			normalized_distance = float(numpy.interp(distance, [0, 2], [0, 1]))
 
-			if normalized_distance < best_distance and normalized_distance < similarity_threshold:
-				best_distance = normalized_distance
-				best_face = target_face
-		except Exception:
-			# Skip faces that cause errors in distance calculation
+			# 计算相似度百分比 (1 - distance)
+			similarity_percentage = (1 - normalized_distance) * 100
+
+			print(f"    人脸[{i}] - 原始距离: {distance:.4f}, 标准化距离: {normalized_distance:.4f}, 相似度: {similarity_percentage:.2f}%")
+
+			if normalized_distance < similarity_threshold:
+				print(f"    人脸[{i}] - ✅ 超过阈值，相似度足够")
+				if normalized_distance < best_distance:
+					best_distance = normalized_distance
+					best_face = target_face
+					print(f"    人脸[{i}] - 🎯 更新为最佳匹配")
+			else:
+				print(f"    人脸[{i}] - ❌ 未超过阈值，相似度不足")
+
+		except Exception as e:
+			print(f"    人脸[{i}] - ⚠️ 计算相似度时出错: {e}")
 			continue
+
+	if best_face:
+		final_similarity = (1 - best_distance) * 100
+		print(f"  [调试] 最终选择的人脸相似度: {final_similarity:.2f}% (距离: {best_distance:.4f})")
+	else:
+		print(f"  [调试] 未找到相似度超过阈值 {similarity_threshold} 的人脸")
 
 	return best_face
 
@@ -680,13 +701,18 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 			# Process each source face with its corresponding mapping
 			for index, source_face in enumerate(source_faces_inputs):
 				if str(index) in faces_mapping_dict:
+					print(f"\n[调试] 处理源图像[{index}] - 帧路径: {target_vision_path}")
+
 					# Create reference face from base64 data
 					reference_face_input = create_face_by_base64(faces_mapping_dict[str(index)])
+					print(f"[调试] 已从base64创建参考人脸[{index}]")
 
 					# Get all faces from current frame
 					current_frame_faces = get_many_faces([target_vision_frame])
+					print(f"[调试] 当前帧检测到 {len(current_frame_faces)} 张人脸")
 
 					# Find the most similar face in the current frame
+					print(f"[调试] 开始为源图像[{index}]寻找最相似的人脸...")
 					most_similar_face = find_most_similar_face(
 						current_frame_faces,
 						reference_face_input,
@@ -694,6 +720,8 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 					)
 
 					if most_similar_face:
+						print(f"[调试] ✅ 找到匹配的人脸，开始换脸处理...")
+
 						# Create reference faces dict with only the most similar face
 						reference_faces_for_swap = {target_vision_path: [most_similar_face]}
 
@@ -704,6 +732,9 @@ def process_frames(source_paths : List[str], queue_payloads : List[QueuePayload]
 							'source_face': source_face,
 							'target_vision_frame': target_vision_frame
 						})
+						print(f"[调试] ✅ 源图像[{index}]换脸处理完成")
+					else:
+						print(f"[调试] ❌ 源图像[{index}]未找到匹配的人脸，跳过处理")
 
 			write_image(target_vision_path, target_vision_frame)
 			update_progress(1)
@@ -775,13 +806,18 @@ def process_image(source_paths : List[str], target_path : str, output_path : str
 		# Process each source face with its corresponding mapping
 		for index, source_face in enumerate(source_faces_inputs):
 			if str(index) in faces_mapping_dict:
+				print(f"\n[调试] 处理源图像[{index}] - 目标图像: {target_path}")
+
 				# Create reference face from base64 data
 				reference_face_input = create_face_by_base64(faces_mapping_dict[str(index)])
+				print(f"[调试] 已从base64创建参考人脸[{index}]")
 
 				# Get all faces from target image
 				current_image_faces = get_many_faces([target_vision_frame])
+				print(f"[调试] 目标图像检测到 {len(current_image_faces)} 张人脸")
 
 				# Find the most similar face in the target image
+				print(f"[调试] 开始为源图像[{index}]寻找最相似的人脸...")
 				most_similar_face = find_most_similar_face(
 					current_image_faces,
 					reference_face_input,
@@ -789,6 +825,8 @@ def process_image(source_paths : List[str], target_path : str, output_path : str
 				)
 
 				if most_similar_face:
+					print(f"[调试] ✅ 找到匹配的人脸，开始换脸处理...")
+
 					# Create reference faces dict with only the most similar face
 					reference_faces_for_swap = {target_path: [most_similar_face]}
 
@@ -799,6 +837,9 @@ def process_image(source_paths : List[str], target_path : str, output_path : str
 						'source_face': source_face,
 						'target_vision_frame': target_vision_frame
 					})
+					print(f"[调试] ✅ 源图像[{index}]换脸处理完成")
+				else:
+					print(f"[调试] ❌ 源图像[{index}]未找到匹配的人脸，跳过处理")
 
 		write_image(output_path, target_vision_frame)
 	else:
