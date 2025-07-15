@@ -438,11 +438,20 @@ def process_video(start_time : float) -> ErrorCode:
 		return 1
 
 	temp_frame_paths = resolve_temp_frame_paths(state_manager.get_item('target_path'))
+	logger.info(f'DEBUG: Found {len(temp_frame_paths) if temp_frame_paths else 0} temp frame paths', __name__)
+	logger.info(f'DEBUG: Configured processors: {state_manager.get_item("processors")}', __name__)
+
 	if temp_frame_paths:
-		for processor_module in get_processors_modules(state_manager.get_item('processors')):
+		processor_modules = get_processors_modules(state_manager.get_item('processors'))
+		logger.info(f'DEBUG: Loaded {len(processor_modules)} processor modules', __name__)
+
+		for processor_module in processor_modules:
+			logger.info(f'DEBUG: Starting processor: {processor_module.__name__}', __name__)
 			logger.info(wording.get('processing'), processor_module.__name__)
 			processor_module.process_video(state_manager.get_item('source_paths'), temp_frame_paths)
+			logger.info(f'DEBUG: Completed processor: {processor_module.__name__}', __name__)
 			processor_module.post_process()
+			logger.info(f'DEBUG: Post-processed: {processor_module.__name__}', __name__)
 		if is_process_stopping():
 			return 4
 	else:

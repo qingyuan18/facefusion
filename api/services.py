@@ -465,27 +465,43 @@ class FaceFusionService:
         }
 
         try:
-            # Execute command
-            result = subprocess.run(
+            # Execute command with real-time output
+            print("\nSTARTING EXECUTION WITH REAL-TIME OUTPUT:")
+            print("=" * 80)
+
+            process = subprocess.Popen(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Merge stderr into stdout
                 text=True,
-                timeout=3600  # 1 hour timeout
+                bufsize=1,  # Line buffered
+                universal_newlines=True,
+                env={**os.environ, 'PYTHONUNBUFFERED': '1'}
             )
 
-            # Print execution results
-            print("\nEXECUTION RESULTS:")
-            print(f"Return code: {result.returncode}")
-            if result.stdout:
-                print("STDOUT:")
-                print(result.stdout[:1000])  # First 1000 chars
-                if len(result.stdout) > 1000:
-                    print("... (truncated)")
-            if result.stderr:
-                print("STDERR:")
-                print(result.stderr[:1000])  # First 1000 chars
-                if len(result.stderr) > 1000:
-                    print("... (truncated)")
+            # Real-time output capture
+            stdout_lines = []
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    print(output.strip())  # Print immediately
+                    stdout_lines.append(output)
+                    sys.stdout.flush()  # Force flush
+
+            # Wait for process to complete
+            return_code = process.poll()
+
+            # Create result object for compatibility
+            result = type('Result', (), {
+                'returncode': return_code,
+                'stdout': ''.join(stdout_lines),
+                'stderr': ''
+            })()
+
+            print("=" * 80)
+            print(f"EXECUTION COMPLETED - Return code: {result.returncode}")
             print("=" * 80)
 
             if result.returncode == 0:

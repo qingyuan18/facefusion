@@ -45,11 +45,22 @@ def load_processor_module(processor : str) -> Any:
 
 
 def get_processors_modules(processors : List[str]) -> List[ModuleType]:
+	# Only log if it's a small list (likely the actual execution processors)
+	if len(processors) <= 3:
+		logger.info(f'DEBUG: Loading execution processors: {processors}', __name__)
+
 	processor_modules = []
 
 	for processor in processors:
+		if len(processors) <= 3:
+			logger.info(f'DEBUG: Loading processor module: {processor}', __name__)
 		processor_module = load_processor_module(processor)
+		if len(processors) <= 3:
+			logger.info(f'DEBUG: Successfully loaded processor: {processor_module.__name__}', __name__)
 		processor_modules.append(processor_module)
+
+	if len(processors) <= 3:
+		logger.info(f'DEBUG: Total loaded processor modules: {len(processor_modules)}', __name__)
 	return processor_modules
 
 

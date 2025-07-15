@@ -94,10 +94,25 @@ def apply_args(args : Args, apply_state_item : ApplyStateItem) -> None:
 
 
 def pre_check() -> bool:
+	logger.info(f'AGE_MODIFIER: Starting pre-check for age modifier model', __name__)
+	logger.info(f'AGE_MODIFIER: Current age modifier model: {state_manager.get_item("age_modifier_model")}', __name__)
+
 	model_hash_set = get_model_options().get('hashes')
 	model_source_set = get_model_options().get('sources')
 
-	return conditional_download_hashes(model_hash_set) and conditional_download_sources(model_source_set)
+	logger.info(f'AGE_MODIFIER: Model hash set: {model_hash_set}', __name__)
+	logger.info(f'AGE_MODIFIER: Model source set: {model_source_set}', __name__)
+
+	hash_check = conditional_download_hashes(model_hash_set)
+	source_check = conditional_download_sources(model_source_set)
+
+	logger.info(f'AGE_MODIFIER: Hash check result: {hash_check}', __name__)
+	logger.info(f'AGE_MODIFIER: Source check result: {source_check}', __name__)
+
+	result = hash_check and source_check
+	logger.info(f'AGE_MODIFIER: Pre-check completed with result: {result}', __name__)
+
+	return result
 
 
 def pre_process(mode : ProcessMode) -> bool:
@@ -127,13 +142,22 @@ def post_process() -> None:
 
 
 def modify_age(target_face : Face, temp_vision_frame : VisionFrame) -> VisionFrame:
+	logger.info(f'AGE_MODIFIER: Starting age modification for face', __name__)
+
 	model_templates = get_model_options().get('templates')
 	model_sizes = get_model_options().get('sizes')
+	logger.info(f'AGE_MODIFIER: Model templates: {model_templates}', __name__)
+	logger.info(f'AGE_MODIFIER: Model sizes: {model_sizes}', __name__)
+
 	face_landmark_5 = target_face.landmark_set.get('5/68').copy()
 	crop_vision_frame, affine_matrix = warp_face_by_face_landmark_5(temp_vision_frame, face_landmark_5, model_templates.get('target'), model_sizes.get('target'))
 	extend_face_landmark_5 = scale_face_landmark_5(face_landmark_5, 0.875)
 	extend_vision_frame, extend_affine_matrix = warp_face_by_face_landmark_5(temp_vision_frame, extend_face_landmark_5, model_templates.get('target_with_background'), model_sizes.get('target_with_background'))
 	extend_vision_frame_raw = extend_vision_frame.copy()
+
+	logger.info(f'AGE_MODIFIER: Face cropping completed, crop size: {crop_vision_frame.shape}', __name__)
+	logger.info(f'AGE_MODIFIER: Extended frame size: {extend_vision_frame.shape}', __name__)
+
 	box_mask = create_static_box_mask(model_sizes.get('target_with_background'), state_manager.get_item('face_mask_blur'), (0, 0, 0, 0))
 	crop_masks =\
 	[
@@ -141,6 +165,7 @@ def modify_age(target_face : Face, temp_vision_frame : VisionFrame) -> VisionFra
 	]
 
 	if 'occlusion' in state_manager.get_item('face_mask_types'):
+		logger.info(f'AGE_MODIFIER: Creating occlusion mask', __name__)
 		occlusion_mask = create_occlusion_mask(crop_vision_frame)
 		combined_matrix = merge_matrix([ extend_affine_matrix, cv2.invertAffineTransform(affine_matrix) ])
 		occlusion_mask = cv2.warpAffine(occlusion_mask, combined_matrix, model_sizes.get('target_with_background'))
@@ -148,34 +173,60 @@ def modify_age(target_face : Face, temp_vision_frame : VisionFrame) -> VisionFra
 
 	crop_vision_frame = prepare_vision_frame(crop_vision_frame)
 	extend_vision_frame = prepare_vision_frame(extend_vision_frame)
-	age_modifier_direction = numpy.array(numpy.interp(state_manager.get_item('age_modifier_direction'), [ -100, 100 ], [ 2.5, -2.5 ])).astype(numpy.float32)
+
+	# Log the age direction conversion
+	original_direction = state_manager.get_item('age_modifier_direction')
+	age_modifier_direction = numpy.array(numpy.interp(original_direction, [ -100, 100 ], [ 2.5, -2.5 ])).astype(numpy.float32)
+	logger.info(f'AGE_MODIFIER: Age direction conversion: {original_direction} -> {age_modifier_direction}', __name__)
+
+	logger.info(f'AGE_MODIFIER: Calling forward() for age modification', __name__)
 	extend_vision_frame = forward(crop_vision_frame, extend_vision_frame, age_modifier_direction)
+	logger.info(f'AGE_MODIFIER: Age modification forward() completed', __name__)
+
 	extend_vision_frame = normalize_extend_frame(extend_vision_frame)
 	extend_vision_frame = match_frame_color(extend_vision_frame_raw, extend_vision_frame)
 	extend_affine_matrix *= (model_sizes.get('target')[0] * 4) / model_sizes.get('target_with_background')[0]
 	crop_mask = numpy.minimum.reduce(crop_masks).clip(0, 1)
 	crop_mask = cv2.resize(crop_mask, (model_sizes.get('target')[0] * 4, model_sizes.get('target')[1] * 4))
 	paste_vision_frame = paste_back(temp_vision_frame, extend_vision_frame, crop_mask, extend_affine_matrix)
+
+	logger.info(f'AGE_MODIFIER: Age modification completed successfully', __name__)
 	return paste_vision_frame
 
 
 def forward(crop_vision_frame : VisionFrame, extend_vision_frame : VisionFrame, age_modifier_direction : AgeModifierDirection) -> VisionFrame:
+	logger.info(f'AGE_MODIFIER: Getting inference pool for age modifier model', __name__)
 	age_modifier = get_inference_pool().get('age_modifier')
+	logger.info(f'AGE_MODIFIER: Age modifier model loaded successfully', __name__)
+
 	age_modifier_inputs = {}
 
 	if has_execution_provider('coreml'):
+		logger.info(f'AGE_MODIFIER: Using CoreML execution provider, switching to CPU', __name__)
 		age_modifier.set_providers([ facefusion.choices.execution_provider_set.get('cpu') ])
 
+	logger.info(f'AGE_MODIFIER: Preparing model inputs', __name__)
+	input_names = []
 	for age_modifier_input in age_modifier.get_inputs():
+		input_names.append(age_modifier_input.name)
 		if age_modifier_input.name == 'target':
 			age_modifier_inputs[age_modifier_input.name] = crop_vision_frame
+			logger.info(f'AGE_MODIFIER: Added target input with shape: {crop_vision_frame.shape}', __name__)
 		if age_modifier_input.name == 'target_with_background':
 			age_modifier_inputs[age_modifier_input.name] = extend_vision_frame
+			logger.info(f'AGE_MODIFIER: Added target_with_background input with shape: {extend_vision_frame.shape}', __name__)
 		if age_modifier_input.name == 'direction':
 			age_modifier_inputs[age_modifier_input.name] = age_modifier_direction
+			logger.info(f'AGE_MODIFIER: Added direction input: {age_modifier_direction}', __name__)
 
+	logger.info(f'AGE_MODIFIER: Model expects inputs: {input_names}', __name__)
+	logger.info(f'AGE_MODIFIER: Provided inputs: {list(age_modifier_inputs.keys())}', __name__)
+
+	logger.info(f'AGE_MODIFIER: Running age modifier inference', __name__)
 	with thread_semaphore():
-		crop_vision_frame = age_modifier.run(None, age_modifier_inputs)[0][0]
+		result = age_modifier.run(None, age_modifier_inputs)
+		crop_vision_frame = result[0][0]
+		logger.info(f'AGE_MODIFIER: Inference completed, output shape: {crop_vision_frame.shape}', __name__)
 
 	return crop_vision_frame
 
@@ -207,27 +258,59 @@ def process_frame(inputs : AgeModifierInputs) -> VisionFrame:
 	target_vision_frame = inputs.get('target_vision_frame')
 	many_faces = sort_and_filter_faces(get_many_faces([ target_vision_frame ]))
 
+	logger.info(f'AGE_MODIFIER: Starting frame processing', __name__)
+	logger.info(f'AGE_MODIFIER: Detected {len(many_faces)} faces in frame', __name__)
+	logger.info(f'AGE_MODIFIER: Face selector mode: {state_manager.get_item("face_selector_mode")}', __name__)
+	logger.info(f'AGE_MODIFIER: Age modifier direction: {state_manager.get_item("age_modifier_direction")}', __name__)
+	logger.info(f'AGE_MODIFIER: Age modifier model: {state_manager.get_item("age_modifier_model")}', __name__)
+
+	# Log face details
+	for i, face in enumerate(many_faces):
+		bbox = face.bounding_box
+		face_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+		detector_score = face.score_set.get('detector', 0.0)
+		logger.info(f'AGE_MODIFIER: Face {i}: bbox={bbox}, area={face_area:.0f}px, detector_score={detector_score:.3f}', __name__)
+
 	if state_manager.get_item('face_selector_mode') == 'many':
 		if many_faces:
-			for target_face in many_faces:
+			logger.info(f'AGE_MODIFIER: Processing {len(many_faces)} faces in "many" mode', __name__)
+			for i, target_face in enumerate(many_faces):
+				logger.info(f'AGE_MODIFIER: Modifying age for face {i+1}/{len(many_faces)}', __name__)
 				target_vision_frame = modify_age(target_face, target_vision_frame)
+		else:
+			logger.info(f'AGE_MODIFIER: No faces found for "many" mode processing', __name__)
 	if state_manager.get_item('face_selector_mode') == 'one':
 		target_face = get_one_face(many_faces)
 		if target_face:
+			logger.info(f'AGE_MODIFIER: Processing single face in "one" mode', __name__)
 			target_vision_frame = modify_age(target_face, target_vision_frame)
+		else:
+			logger.info(f'AGE_MODIFIER: No face selected for "one" mode processing', __name__)
 	if state_manager.get_item('face_selector_mode') == 'reference':
 		similar_faces = find_similar_faces(many_faces, reference_faces, state_manager.get_item('reference_face_distance'))
 		if similar_faces:
-			for similar_face in similar_faces:
+			logger.info(f'AGE_MODIFIER: Processing {len(similar_faces)} similar faces in "reference" mode', __name__)
+			for i, similar_face in enumerate(similar_faces):
+				logger.info(f'AGE_MODIFIER: Modifying age for similar face {i+1}/{len(similar_faces)}', __name__)
 				target_vision_frame = modify_age(similar_face, target_vision_frame)
+		else:
+			logger.info(f'AGE_MODIFIER: No similar faces found for "reference" mode processing', __name__)
+
+	logger.info(f'AGE_MODIFIER: Frame processing completed', __name__)
 	return target_vision_frame
 
 
 def process_frames(source_path : List[str], queue_payloads : List[QueuePayload], update_progress : UpdateProgress) -> None:
+	logger.info(f'AGE_MODIFIER: Starting batch frame processing for {len(queue_payloads)} frames', __name__)
 	reference_faces = get_reference_faces() if 'reference' in state_manager.get_item('face_selector_mode') else None
+	logger.info(f'AGE_MODIFIER: Reference faces loaded: {len(reference_faces) if reference_faces else 0}', __name__)
 
+	frame_count = 0
 	for queue_payload in process_manager.manage(queue_payloads):
+		frame_count += 1
 		target_vision_path = queue_payload['frame_path']
+		logger.info(f'AGE_MODIFIER: Processing frame {frame_count}/{len(queue_payloads)}: {target_vision_path}', __name__)
+
 		target_vision_frame = read_image(target_vision_path)
 		output_vision_frame = process_frame(
 		{
@@ -235,7 +318,10 @@ def process_frames(source_path : List[str], queue_payloads : List[QueuePayload],
 			'target_vision_frame': target_vision_frame
 		})
 		write_image(target_vision_path, output_vision_frame)
+		logger.info(f'AGE_MODIFIER: Frame {frame_count} processed and saved', __name__)
 		update_progress(1)
+
+	logger.info(f'AGE_MODIFIER: Batch frame processing completed for {frame_count} frames', __name__)
 
 
 def process_image(source_path : str, target_path : str, output_path : str) -> None:
@@ -250,4 +336,12 @@ def process_image(source_path : str, target_path : str, output_path : str) -> No
 
 
 def process_video(source_paths : List[str], temp_frame_paths : List[str]) -> None:
+	logger.info(f'AGE_MODIFIER: Starting video processing with {len(temp_frame_paths)} frames', __name__)
+	logger.info(f'AGE_MODIFIER: Source paths: {source_paths}', __name__)
+	logger.info(f'AGE_MODIFIER: Age modifier model: {state_manager.get_item("age_modifier_model")}', __name__)
+	logger.info(f'AGE_MODIFIER: Age modifier direction: {state_manager.get_item("age_modifier_direction")}', __name__)
+	logger.info(f'AGE_MODIFIER: Face selector mode: {state_manager.get_item("face_selector_mode")}', __name__)
+
 	processors.multi_process_frames(None, temp_frame_paths, process_frames)
+
+	logger.info(f'AGE_MODIFIER: Video processing completed', __name__)
